@@ -190,16 +190,22 @@ class Brain2Text(nn.Module):
 
         Args:
             text_tokens: ``(B, T)`` target token IDs (byte-level).
+                Raw text bytes — BOS is prepended automatically.
             brain_data: Corresponding fMRI data.
 
         Returns:
             Scalar cross-entropy loss.
         """
+        B, T = text_tokens.shape
         _, brain_tokens = self.brain_encoder(brain_data.voxels)
 
-        # Input: [BOS, t1, t2, ..., t_{n-1}], Target: [t1, t2, ..., t_n]
-        input_tokens = text_tokens[:, :-1]
-        target_tokens = text_tokens[:, 1:]
+        # Prepend BOS so the model learns to predict from BOS context
+        # Input: [BOS, t1, t2, ..., t_{T-1}], Target: [t1, t2, ..., t_T]
+        bos = torch.full(
+            (B, 1), self.bos_token, dtype=torch.long, device=text_tokens.device
+        )
+        input_tokens = torch.cat([bos, text_tokens[:, :-1]], dim=1)
+        target_tokens = text_tokens
 
         logits = self.decoder(input_tokens, brain_tokens)
         return F.cross_entropy(
@@ -254,8 +260,8 @@ class Brain2Text(nn.Module):
             if (next_token == 0).all():
                 break
 
-        # Decode to text
-        texts = [self.tokens_to_text(generated[i]) for i in range(B)]
+        # Decode to text (skip BOS token at position 0)
+        texts = [self.tokens_to_text(generated[i, 1:]) for i in range(B)]
 
         return ReconstructionResult(
             modality=Modality.TEXT,

@@ -330,7 +330,11 @@ class DiffusionTransformer(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self) -> None:
-        """Initialize weights following DiT conventions."""
+        """Initialize weights following DiT conventions.
+
+        Global Xavier init first, then re-apply zero-init on gating
+        parameters (AdaLN modulation, final layer) for stable training.
+        """
 
         def _init(m: nn.Module) -> None:
             if isinstance(m, nn.Linear):
@@ -343,6 +347,15 @@ class DiffusionTransformer(nn.Module):
                     nn.init.zeros_(m.bias)
 
         self.apply(_init)
+
+        # Re-apply zero-init on gating parameters (overwritten by global init)
+        for block in self.blocks:
+            nn.init.zeros_(block.adaLN_modulation[-1].weight)
+            nn.init.zeros_(block.adaLN_modulation[-1].bias)
+        nn.init.zeros_(self.final_layer.adaLN[-1].weight)
+        nn.init.zeros_(self.final_layer.adaLN[-1].bias)
+        nn.init.zeros_(self.final_layer.proj.weight)
+        nn.init.zeros_(self.final_layer.proj.bias)
 
     def unpatchify(self, x: torch.Tensor) -> torch.Tensor:
         """Reshape patch tokens back to spatial latent maps.

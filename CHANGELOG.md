@@ -2,6 +2,14 @@
 
 All notable changes to CortexFlow will be documented in this file.
 
+## [0.1.1] - 2025-06-26
+
+### Fixed
+
+- **DiT zero-init**: `_initialize_weights()` no longer overwrites critical zero-initialized gating parameters (AdaLN modulation, final layer projection). Output is now exactly zero at initialization for stable training.
+- **Brain2Text BOS mismatch**: Training now prepends BOS token so the model learns to predict from BOS context, matching inference behavior.
+- **Brain2Text empty output**: `reconstruct()` now correctly skips the BOS token when decoding generated sequences to text.
+
 ## [0.1.0] - 2025-06-25
 
 ### Added
