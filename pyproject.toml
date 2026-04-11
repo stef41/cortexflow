@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cortexflow"
+version = "0.1.0"
+description = "Brain-to-image/audio/text reconstruction using Diffusion Transformers and Flow Matching. Decode what someone saw, heard, or thought from fMRI."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9"
+authors = [{ name = "Zacharie B" }]
+keywords = [
+    "brain-decoding",
+    "fmri",
+    "diffusion-transformer",
+    "flow-matching",
+    "neuroscience",
+    "bci",
+    "brain-computer-interface",
+    "image-reconstruction",
+    "neural-decoding",
+    "dit",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "torch>=2.0",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+audio = ["torchaudio>=2.0"]
+cli = ["click>=8.0", "rich>=13.0"]
+all = ["cortexflow[audio,cli]"]
+
+[project.urls]
+Homepage = "https://github.com/stef41/cortexflow"
+Repository = "https://github.com/stef41/cortexflow"
+Issues = "https://github.com/stef41/cortexflow/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cortexflow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501", "E741", "B904", "B017", "SIM102", "SIM105"]
