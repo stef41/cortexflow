@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cortexflow"
+name = "cortexflowx"
 version = "0.1.0"
 description = "Brain-to-image/audio/text reconstruction using Diffusion Transformers and Flow Matching. Decode what someone saw, heard, or thought from fMRI."
 readme = "README.md"
@@ -42,7 +42,7 @@ dependencies = [
 [project.optional-dependencies]
 audio = ["torchaudio>=2.0"]
 cli = ["click>=8.0", "rich>=13.0"]
-all = ["cortexflow[audio,cli]"]
+all = ["cortexflowx[audio,cli]"]
 
 [project.urls]
 Homepage = "https://github.com/stef41/cortexflow"

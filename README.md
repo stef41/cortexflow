@@ -30,12 +30,12 @@ fMRI voxels
 ## Installation
 
 ```bash
-pip install cortexflow
+pip install cortexflowx
 ```
 
 With audio support:
 ```bash
-pip install cortexflow[audio]
+pip install cortexflowx[audio]
 ```
 
 ## Quick Start
