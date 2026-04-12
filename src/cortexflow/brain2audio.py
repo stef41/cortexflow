@@ -212,6 +212,7 @@ class Brain2Audio(nn.Module):
         num_steps: int = 50,
         cfg_scale: float = 3.0,
         num_samples: int = 1,
+        brain_noise: float = 0.0,
     ) -> ReconstructionResult:
         """Reconstruct audio mel spectrogram from brain activity.
 
@@ -220,9 +221,15 @@ class Brain2Audio(nn.Module):
             num_steps: Number of ODE solver steps.
             cfg_scale: Classifier-free guidance scale.
             num_samples: Number of diverse samples per brain input.
-                Each sample uses independent noise, producing semantically
-                varied reconstructions. Output shape becomes
-                ``(B, num_samples, n_mels, T)`` when ``num_samples > 1``.
+                Each sample uses independent generation noise **and**
+                a different perturbation of the brain conditioning.
+                Output shape becomes ``(B, num_samples, n_mels, T)``
+                when ``num_samples > 1``.
+            brain_noise: Scale of Gaussian noise injected into brain
+                embeddings. Each sample gets an independent perturbation,
+                so different samples explore different interpretations
+                of the brain signal. 0.0 = no perturbation. Typical
+                range: 0.1–1.0.
 
         Returns:
             ReconstructionResult with the decoded mel spectrogram(s).
@@ -237,6 +244,12 @@ class Brain2Audio(nn.Module):
             brain_tokens = brain_tokens.repeat_interleave(num_samples, dim=0)
 
         BN = B * num_samples
+
+        # Perturb brain embeddings — each sample explores a different
+        # interpretation of the brain signal
+        if brain_noise > 0.0:
+            brain_global = brain_global + brain_noise * torch.randn_like(brain_global)
+            brain_tokens = brain_tokens + brain_noise * torch.randn_like(brain_tokens)
 
         mel_shape = (BN, self.n_mels, self.audio_len)
         mel = self.flow_matcher.sample(
@@ -256,7 +269,7 @@ class Brain2Audio(nn.Module):
             brain_condition=brain_global[:B],
             n_steps=num_steps,
             cfg_scale=cfg_scale,
-            metadata={"num_samples": num_samples},
+            metadata={"num_samples": num_samples, "brain_noise": brain_noise},
         )
 
     @staticmethod

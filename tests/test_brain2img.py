@@ -93,6 +93,28 @@ class TestBrain2Image:
         sample_1 = result.output[:, 1]
         assert not torch.allclose(sample_0, sample_1), "Diverse samples should differ"
 
+    def test_brain_noise_increases_diversity(self, model, brain_data):
+        """brain_noise should perturb brain embeddings for semantic diversity."""
+        model.eval()
+        result = model.reconstruct(
+            brain_data, num_steps=2, num_samples=2, brain_noise=0.5,
+        )
+        assert result.output.shape == (BATCH, 2, 3, IMG_SIZE, IMG_SIZE)
+        sample_0 = result.output[:, 0]
+        sample_1 = result.output[:, 1]
+        assert not torch.allclose(sample_0, sample_1)
+        assert result.metadata["brain_noise"] == 0.5
+
+    def test_brain_noise_zero_same_as_default(self, model):
+        """brain_noise=0 with num_samples=1 should match default."""
+        bd = BrainData(voxels=torch.randn(1, N_VOXELS))
+        model.eval()
+        torch.manual_seed(42)
+        r1 = model.reconstruct(bd, num_steps=2, brain_noise=0.0)
+        torch.manual_seed(42)
+        r2 = model.reconstruct(bd, num_steps=2)
+        assert torch.allclose(r1.output, r2.output)
+
     def test_reconstruct_num_samples_1(self, model, brain_data):
         """num_samples=1 should behave like the default."""
         model.eval()

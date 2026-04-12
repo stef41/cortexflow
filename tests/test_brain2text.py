@@ -169,6 +169,20 @@ class TestBrain2Text:
                 break
         assert any_differ, "At high temperature, diverse samples should differ"
 
+    def test_brain_noise_text_diversity(self, model, brain_data):
+        """brain_noise should produce diverse text via brain perturbation."""
+        model.eval()
+        result = model.reconstruct(
+            brain_data, max_len=8, num_samples=3, brain_noise=0.5,
+            temperature=1.0,
+        )
+        texts = result.metadata["texts"]
+        assert len(texts) == BATCH
+        for group in texts:
+            assert isinstance(group, list)
+            assert len(group) == 3
+        assert result.metadata["brain_noise"] == 0.5
+
     def test_reconstruct_top_p(self, model, brain_data):
         model.eval()
         result = model.reconstruct(brain_data, max_len=8, top_p=0.9, top_k=0)

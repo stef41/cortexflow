@@ -2,6 +2,12 @@
 
 All notable changes to CortexFlow will be documented in this file.
 
+## [0.3.0] - 2026-04-12
+
+### Added
+
+- **Brain-signal diversity** (`brain_noise`): All pipelines accept a `brain_noise` parameter that injects Gaussian perturbations into brain conditioning embeddings. Each sample explores a different interpretation of the brain signal — semantic diversity driven by the brain, not just generation noise. Typical range: 0.1–1.0.
+
 ## [0.2.0] - 2026-04-12
 
 ### Added

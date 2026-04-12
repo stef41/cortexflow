@@ -223,6 +223,7 @@ class Brain2Text(nn.Module):
         top_k: int = 50,
         top_p: float = 0.0,
         num_samples: int = 1,
+        brain_noise: float = 0.0,
     ) -> ReconstructionResult:
         """Reconstruct text from brain activity via autoregressive decoding.
 
@@ -236,10 +237,15 @@ class Brain2Text(nn.Module):
                 >= ``top_p`` are kept. Promotes semantic diversity.
             num_samples: Number of diverse samples per brain input.
                 Each sample decodes independently with different random
-                draws, producing semantically varied texts. When
-                ``num_samples > 1``, ``metadata["texts"]`` is a list of
-                lists: ``texts[i]`` contains ``num_samples`` strings for
-                brain input *i*.
+                draws **and** a different perturbation of the brain
+                conditioning. When ``num_samples > 1``,
+                ``metadata["texts"]`` is a list of lists: ``texts[i]``
+                contains ``num_samples`` strings for brain input *i*.
+            brain_noise: Scale of Gaussian noise injected into brain
+                embeddings. Each sample gets an independent perturbation,
+                so different samples explore different interpretations
+                of the brain signal. 0.0 = no perturbation. Typical
+                range: 0.1–1.0.
 
         Returns:
             ReconstructionResult with generated text as metadata.
@@ -255,6 +261,11 @@ class Brain2Text(nn.Module):
             brain_tokens = brain_tokens.repeat_interleave(num_samples, dim=0)
 
         BN = B * num_samples
+
+        # Perturb brain embeddings — each sample explores a different
+        # interpretation of the brain signal
+        if brain_noise > 0.0:
+            brain_tokens = brain_tokens + brain_noise * torch.randn_like(brain_tokens)
 
         # Start with BOS token
         generated = torch.full((BN, 1), self.bos_token, dtype=torch.long, device=device)
@@ -303,7 +314,7 @@ class Brain2Text(nn.Module):
             modality=Modality.TEXT,
             output=generated,
             brain_condition=brain_tokens[:B].mean(dim=1),
-            metadata={"texts": texts, "num_samples": num_samples},
+            metadata={"texts": texts, "num_samples": num_samples, "brain_noise": brain_noise},
         )
 
 
