@@ -1,102 +1,122 @@
 {
   "data_source": "neuroprobe forward encoding (stimulus -> simulated BOLD)",
   "split": {
-    "total": 200,
-    "train": 160,
-    "test": 40
+    "total": 300,
+    "train": 240,
+    "test": 60
   },
   "n_voxels": 512,
   "image": {
-    "final_loss": 0.021442,
+    "final_loss": 0.045321,
     "train": {
-      "mean_cos": 0.997541,
-      "mean_ssim": 0.9883
+      "mean_cos": 0.995218,
+      "mean_ssim": 0.981647
     },
     "test": {
-      "mean_cos": 0.780398,
-      "mean_ssim": 0.370624
+      "mean_cos": 0.883423,
+      "mean_ssim": 0.499845
     },
-    "generalization_gap_cos": 0.217143,
+    "generalization_gap_cos": 0.111794,
     "random_baseline": {
       "cos": 0.68525,
       "ssim": 0.055577
     },
-    "test_above_baseline_cos": 0.095148,
-    "inter_output_cos": 0.864633
+    "test_above_baseline_cos": 0.198174,
+    "inter_output_cos": 0.908081
   },
   "audio": {
-    "final_loss": 0.015484,
+    "final_loss": 0.020288,
     "train": {
-      "mean_cos": 0.962408
+      "mean_cos": 0.948765
     },
     "test": {
-      "mean_cos": 0.860595
+      "mean_cos": 0.883167
     },
-    "generalization_gap_cos": 0.101812,
+    "generalization_gap_cos": 0.065599,
     "random_baseline_cos": 0.543702,
-    "test_above_baseline_cos": 0.316894
+    "test_above_baseline_cos": 0.339465
   },
   "text": {
-    "final_loss": 0.000993,
+    "final_loss": 0.006225,
     "train": {
       "exact_match": 93,
-      "total": 160
+      "total": 240
     },
     "test": {
       "exact_match": 0,
-      "total": 40
+      "total": 60
     },
     "results": {
-      "sob": "snow",
-      "tan": "nain",
-      "vet": "tine",
-      "woe": "ewew",
-      "yap": "pape",
-      "zen": "gape",
-      "aim": "jamm",
-      "bun": "unnx",
-      "cap": "cape",
-      "dab": "c\ufffdrk",
-      "egg": "kege",
-      "fan": "fawn",
-      "gin": "gnit",
-      "hog": "gold",
-      "ice": "jige",
-      "jut": "gusk",
-      "kin": "kitk",
-      "lip": "glom",
-      "mug": "gumm",
-      "nod": "nond",
-      "oat": "snow",
-      "pen": "pene",
-      "rag": "rain",
-      "sip": "mist",
-      "tap": "pape",
-      "van": "vain",
-      "wok": "dock",
-      "yip": "pipp",
-      "zag": "jazz",
-      "ant": "nain",
-      "bib": "bine",
-      "cog": "bogo",
-      "dig": "tide",
-      "ear": "arch",
-      "fad": "faCn",
-      "gab": "bass",
-      "hob": "chop",
-      "ilk": "jige",
-      "jar": "jaze",
-      "koi": "kkkk"
+      "bez": "beck",
+      "bic": "bibe",
+      "bid": "wibd",
+      "bif": "wigd",
+      "big": "bigg",
+      "bih": "bo\u0006d",
+      "bij": "bibe",
+      "bik": "wibd",
+      "bil": "soge",
+      "bim": "iris",
+      "bin": "nibn",
+      "bip": "bipe",
+      "biq": "bibe",
+      "bir": "iris",
+      "bis": "bibe",
+      "bit": "biqt",
+      "biv": "bird",
+      "biw": "wibd",
+      "bix": "bibe",
+      "biy": "bird",
+      "biz": "iris",
+      "boc": "cobe",
+      "bod": "wobo",
+      "bof": "bowe",
+      "boh": "hobe",
+      "boj": "sobk",
+      "bok": "bowk",
+      "bol": "boss",
+      "bom": "sobp",
+      "bon": "nobw",
+      "bop": "sobe",
+      "boq": "sobe",
+      "bor": "orbo",
+      "bos": "sobe",
+      "bot": "snow",
+      "bov": "cork",
+      "bow": "hobw",
+      "box": "bowe",
+      "boy": "snow",
+      "boz": "sobk",
+      "buc": "cubk",
+      "bud": "wird",
+      "buf": "wuew",
+      "buh": "yore",
+      "cab": "bace",
+      "cad": "jade",
+      "cam": "came",
+      "can": "vate",
+      "car": "acre",
+      "cas": "cace",
+      "cat": "jate",
+      "caw": "wach",
+      "cob": "cobe",
+      "cod": "code",
+      "col": "coo\ufffd",
+      "con": "snow",
+      "cop": "chop",
+      "cor": "cork",
+      "cos": "copc",
+      "cot": "coto"
     }
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.096538,
+    "mean_l2": 0.10921,
     "per_input": [
-      0.099318,
-      0.061075,
-      0.172354,
-      0.053407
+      0.041864,
+      0.136167,
+      0.149514,
+      0.109297
     ]
   }
 }

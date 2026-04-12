@@ -47,9 +47,9 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-N_TOTAL = 200       # total (brain, stimulus) pairs
-N_TRAIN = 160       # training set
-N_TEST = 40         # held-out test set (NEVER seen during training)
+N_TOTAL = 300       # total (brain, stimulus) pairs
+N_TRAIN = 240       # training set
+N_TEST = 60         # held-out test set (NEVER seen during training)
 N_VOXELS = 512      # brain activity dimensionality
 IMG_SIZE = 32       # cortexflow output image size
 N_MELS = 8          # mel spectrogram bands (reduced to match image latent dim)
@@ -277,6 +277,19 @@ _base_words = [
     "kin", "lip", "mug", "nod", "oat", "pen", "rag", "sip",
     "tap", "van", "wok", "yip", "zag", "ant", "bib", "cog",
     "dig", "ear", "fad", "gab", "hob", "ilk", "jar", "koi",
+    "bab", "bac", "bad", "baf", "bag", "bah", "baj", "bak",
+    "bal", "bam", "ban", "bap", "baq", "bar", "bas", "bat",
+    "bav", "baw", "bax", "baz", "beb", "bec", "bed", "bef",
+    "beg", "beh", "bej", "bek", "bel", "bem", "ben", "bep",
+    "beq", "ber", "bes", "bet", "bev", "bew", "bex", "bey",
+    "bez", "bic", "bid", "bif", "big", "bih", "bij", "bik",
+    "bil", "bim", "bin", "bip", "biq", "bir", "bis", "bit",
+    "biv", "biw", "bix", "biy", "biz", "boc", "bod", "bof",
+    "boh", "boj", "bok", "bol", "bom", "bon", "bop", "boq",
+    "bor", "bos", "bot", "bov", "bow", "box", "boy", "boz",
+    "buc", "bud", "buf", "buh",
+    "cab", "cad", "cam", "can", "car", "cas", "cat", "caw",
+    "cob", "cod", "col", "con", "cop", "cor", "cos", "cot",
 ]
 words = _base_words[:N_TOTAL]
 text_brains, text_tokens_list = [], []
@@ -1189,7 +1202,7 @@ if test_cos_img > lin_mean:
     print(f"    DiT BEATS linear baseline! Residual DiT + EMA + multi-sample averaging.")
 else:
     print(f"    NOTE: DiT captures color + layout but linear probe is still stronger")
-    print(f"          at this scale (96 samples, CPU). At larger data scales,")
+    print(f"          at this scale ({N_TRAIN} samples, CPU). At larger data scales,")
     print(f"          the flow matching architecture's non-linear path outperforms linear.")
 print(f"\n  Brain → Audio (mel VAE + flow matching in latent space):")
 print(f"    TRAIN: cos={train_cos_aud:.3f}")
