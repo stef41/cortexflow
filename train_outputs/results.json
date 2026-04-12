@@ -25,16 +25,16 @@
     "inter_output_cos": 0.739566
   },
   "audio": {
-    "final_loss": 0.853333,
+    "final_loss": 0.012186,
     "train": {
-      "mean_cos": 0.697136
+      "mean_cos": 0.977059
     },
     "test": {
-      "mean_cos": 0.686817
+      "mean_cos": 0.84096
     },
-    "generalization_gap_cos": 0.010319,
+    "generalization_gap_cos": 0.136099,
     "random_baseline_cos": 0.543702,
-    "test_above_baseline_cos": 0.143116
+    "test_above_baseline_cos": 0.297259
   },
   "text": {
     "final_loss": 0.00066,

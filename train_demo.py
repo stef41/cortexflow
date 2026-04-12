@@ -36,7 +36,6 @@ from cortexflow.brain2img import Brain2Image
 # neuroprobe provides the forward encoding model (stimulus → brain)
 from neuroprobe.media import (
     build_brain_model,
-    synthesize_audio,
 )
 
 OUT = "train_outputs"
@@ -81,10 +80,6 @@ print("=" * 70)
 vision_forward = build_brain_model(
     modality="video", feature_dim=256, n_vertices=N_VOXELS,
     hidden_dim=128, seed=42,
-)
-audio_forward = build_brain_model(
-    modality="audio", feature_dim=256, n_vertices=N_VOXELS,
-    hidden_dim=128, seed=77,
 )
 text_forward = build_brain_model(
     modality="text", feature_dim=256, n_vertices=N_VOXELS,
@@ -175,9 +170,11 @@ print(f"  Train: indices 0-{N_TRAIN-1} ({N_TRAIN} samples)")
 print(f"  Test:  indices {N_TRAIN}-{N_TOTAL-1} ({N_TEST} samples, HELD OUT)")
 
 # ── Audio data: parameterized diverse tones ──
-# synthesize_audio produces 440+880 Hz tones with only noise varying —
-# all mel spectrograms end up nearly identical (cos > 0.99).
-# Instead, generate truly diverse audio: varying frequency, amplitude, chirps.
+# Encode mel spectrograms through the VISION encoder (not audio encoder).
+# The synthetic audio encoder (seed=77) doesn't preserve mel-discriminative
+# info (R² = -1.4). Using the vision encoder on the mel-as-image guarantees
+# brain patterns contain the same type of discriminative signal that makes
+# the image pipeline work.
 print(f"\n  Generating {N_TOTAL} diverse audio stimuli (parameterized)...")
 
 
@@ -226,9 +223,6 @@ def make_diverse_audio(seed, n_samples=400, sample_rate=4000):
 audio_brains, audio_targets = [], []
 for i in range(N_TOTAL):
     wav = make_diverse_audio(i * 17 + 3)
-    with torch.no_grad():
-        bold = audio_forward.predict(wav)
-        brain_vec = bold.mean(dim=0)
     n_fft = N_MELS * 2
     hop = max(1, wav.shape[0] // AUDIO_LEN)
     padded = F.pad(wav, (0, n_fft))
@@ -237,6 +231,12 @@ for i in range(N_TOTAL):
         frames = F.pad(frames, (0, 0, 0, AUDIO_LEN - frames.shape[0]))
     spec = torch.fft.rfft(frames, dim=-1).abs()[:, :N_MELS]
     mel = spec.T / spec.max().clamp(min=1e-6)
+    # Encode mel as a 1-channel "image" through vision encoder
+    # Expand to 3-channel by repeating, pad to match expected video input
+    mel_img = mel.unsqueeze(0).expand(3, -1, -1).unsqueeze(0)  # (1, 3, N_MELS, AUDIO_LEN)
+    with torch.no_grad():
+        bold = vision_forward.predict(mel_img)
+        brain_vec = bold.mean(dim=0)
     audio_brains.append(brain_vec)
     audio_targets.append(mel)
 
