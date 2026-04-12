@@ -437,6 +437,34 @@ results = {
     },
 }
 
+# Add diversity evaluation to results
+print("\n  Evaluating semantic diversity (brain_noise=0.3, 4 samples)...")
+diversity_scores = []
+for i in range(min(4, N_SAMPLES)):
+    brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+    samples = []
+    for s in range(4):
+        torch.manual_seed(s * 17 + 3)
+        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.3)
+        samples.append(out.output[0].detach())
+    pair_dists = []
+    for a in range(len(samples)):
+        for b in range(a + 1, len(samples)):
+            dist = (samples[a] - samples[b]).pow(2).mean().sqrt().item()
+            pair_dists.append(dist)
+    mean_dist = sum(pair_dists) / len(pair_dists)
+    diversity_scores.append(mean_dist)
+    print(f"    Brain {i}: mean inter-sample L2 = {mean_dist:.4f}")
+
+mean_diversity = sum(diversity_scores) / len(diversity_scores)
+print(f"  Overall mean diversity: {mean_diversity:.4f}")
+results["semantic_diversity"] = {
+    "brain_noise": 0.3,
+    "num_samples": 4,
+    "mean_inter_sample_l2": mean_diversity,
+    "per_input_l2": diversity_scores,
+}
+
 with open(f"{OUT}/results.json", "w") as f:
     json.dump({k: (round(v, 6) if isinstance(v, float) else
                     {kk: round(vv, 6) if isinstance(vv, float) else vv
@@ -527,6 +555,46 @@ try:
     plt.close(fig)
     print(f"  Saved {OUT}/text_reconstructions.png")
 
+    # ── Semantic diversity visualization ──
+    # Generate multiple samples from same brain input using brain_noise
+    N_DIVERSE = 4   # samples per brain input
+    N_SHOW_DIV = 4  # number of brain inputs to show
+    print("\n  Generating semantic diversity visualization...")
+
+    fig, axes = plt.subplots(N_SHOW_DIV, N_DIVERSE + 1, figsize=(3 * (N_DIVERSE + 1), 3 * N_SHOW_DIV))
+
+    for row in range(N_SHOW_DIV):
+        brain = BrainData(voxels=brain_patterns_img[row:row + 1])
+        # Show target in first column
+        t = target_images[row].permute(1, 2, 0).clamp(0, 1).numpy()
+        axes[row, 0].imshow(t, interpolation="nearest")
+        axes[row, 0].set_title(f"Target {row}", fontsize=9)
+        axes[row, 0].axis("off")
+
+        # Generate N_DIVERSE samples with brain_noise for diversity
+        for s in range(N_DIVERSE):
+            torch.manual_seed(s * 17 + 3)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0,
+                                        brain_noise=0.3)
+            sample = out.output[0].detach().clamp(0, 1)
+            r = sample.permute(1, 2, 0).numpy()
+            axes[row, s + 1].imshow(r, interpolation="nearest")
+
+            cos_to_target = F.cosine_similarity(
+                sample.flatten().unsqueeze(0),
+                target_images[row].flatten().unsqueeze(0),
+            ).item()
+            axes[row, s + 1].set_title(f"Sample {s} (cos={cos_to_target:.2f})", fontsize=8)
+            axes[row, s + 1].axis("off")
+
+    fig.suptitle(f"Semantic Diversity: {N_DIVERSE} samples per brain input "
+                 f"(brain_noise=0.3, mean L2={mean_diversity:.3f})",
+                 fontsize=11)
+    fig.tight_layout()
+    fig.savefig(f"{OUT}/semantic_diversity.png", dpi=150)
+    plt.close(fig)
+    print(f"  Saved {OUT}/semantic_diversity.png")
+
 except ImportError:
     print("  matplotlib not available, skipping visualization")
 
@@ -551,7 +619,8 @@ print(f"  Brain → Audio:  loss {audio_losses[0]:.3f} → {audio_losses[-1]:.3f
       f"good: {good_aud}/{N_SAMPLES}")
 print(f"  Brain → Text:   loss {text_losses[0]:.3f} → {text_losses[-1]:.3f} "
       f"(min: {min(text_losses):.3f}), exact: {correct_text}/{N_SAMPLES}")
+print(f"  Semantic diversity: mean inter-sample L2 = {mean_diversity:.4f}")
 
 all_pass = (good_img >= N_SAMPLES // 2 and good_aud >= N_SAMPLES // 2
-            and correct_text >= N_SAMPLES // 2)
+            and correct_text >= N_SAMPLES // 2 and mean_diversity > 0.01)
 print(f"\n  Overall: {'PASS' if all_pass else 'FAIL'}")
