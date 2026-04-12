@@ -7,26 +7,32 @@
   },
   "n_voxels": 512,
   "image": {
-    "final_loss": 1.190417,
+    "final_loss": 0.031355,
     "train": {
-      "mean_cos": 0.800927,
-      "mean_ssim": 0.125053
+      "mean_cos": 0.997622,
+      "mean_ssim": 0.987767
     },
     "test": {
-      "mean_cos": 0.799199,
-      "mean_ssim": 0.06664
+      "mean_cos": 0.835164,
+      "mean_ssim": 0.408679
     },
-    "generalization_gap_cos": 0.001728
+    "generalization_gap_cos": 0.162458,
+    "random_baseline": {
+      "cos": 0.68525,
+      "ssim": 0.055577
+    },
+    "test_above_baseline_cos": 0.149915,
+    "inter_output_cos": 0.751963
   },
   "audio": {
     "final_loss": 0.04969,
     "train": {
-      "mean_cos": 0.95769
+      "mean_cos": 0.965427
     },
     "test": {
-      "mean_cos": 0.95689
+      "mean_cos": 0.964665
     },
-    "generalization_gap_cos": 0.0008
+    "generalization_gap_cos": 0.000762
   },
   "text": {
     "final_loss": 0.021498,
@@ -67,12 +73,12 @@
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.258304,
+    "mean_l2": 0.149708,
     "per_input": [
-      0.320124,
-      0.352976,
-      0.095503,
-      0.264613
+      0.233147,
+      0.147319,
+      0.066501,
+      0.151865
     ]
   }
 }

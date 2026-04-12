@@ -1,0 +1,26 @@
+======================================================================
+GENERATING DATA VIA NEUROPROBE FORWARD ENCODER
+======================================================================
+  Forward models: stimulus → 128-dim brain activity
+
+  Generating 16 clean synthetic images (32x32)...
+  Brain: torch.Size([16, 128]), range [-1.15, 2.60]
+  Images: torch.Size([16, 3, 32, 32]) — clean geometric shapes
+
+  Generating 16 audio stimuli via synthesize_audio...
+  Brain: torch.Size([16, 128])
+  Mels: torch.Size([16, 16, 16])
+
+  Generating 16 text stimuli...
+/data/users/zacharie/repogen/cortexflow/train_demo.py:206: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  token_t = torch.tensor(tokens, dtype=torch.long).clamp(max=255)
+/data/users/zacharie/repogen/cortexflow/train_demo.py:211: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  padded[:len(tokens)] = torch.tensor(tokens)
+  Brain: torch.Size([16, 128])
+  Words: ['fire', 'lake', 'moon', 'star', 'wind', 'rain', 'tree', 'bird', 'gold', 'iron', 'dust', 'salt', 'bone', 'silk', 'jade', 'rust']
+
+======================================================================
+TRAINING BRAIN → IMAGE
+======================================================================
+  Pre-training VAE on target images...
+    VAE step 0: recon=0.493652 kl=0.1130 (16s)

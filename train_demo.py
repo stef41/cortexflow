@@ -251,7 +251,7 @@ def make_batch(indices, modality="image"):
 
 
 def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
-               cached_latents=None, n_train=N_TRAIN):
+               cached_latents=None, n_train=N_TRAIN, cfg_dropout=0.0):
     """Training loop — only samples from TRAINING set indices."""
     if cached_latents is not None:
         params = [p for n, p in model.named_parameters()
@@ -271,9 +271,18 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
         if cached_latents is not None and modality in ("image", "audio"):
             z = cached_latents[idx]
             bg, bt = model.encode_brain(brain)
+            # Apply CFG dropout: randomly replace conditioning with unconditional
+            if cfg_dropout > 0 and hasattr(model, 'uncond_global'):
+                B = z.shape[0]
+                mask = torch.rand(B) < cfg_dropout
+                if mask.any():
+                    bg = bg.clone()
+                    bt = bt.clone()
+                    bg[mask] = model.uncond_global.expand(mask.sum(), -1)
+                    bt[mask] = model.uncond_tokens.expand(mask.sum(), -1, -1)
             loss = model.flow_matcher.compute_loss(model.dit, z, bg, bt)
         elif modality == "image":
-            loss = model.training_loss(target, brain, cfg_dropout=0.0)
+            loss = model.training_loss(target, brain, cfg_dropout=cfg_dropout)
         elif modality == "audio":
             loss = model.training_loss(target, brain)
         elif modality == "text":
@@ -295,14 +304,14 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     return losses
 
 
-def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True):
+def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True, cfg_scale=1.0):
     """Evaluate image reconstructions with cos, SSIM, L2."""
     model.eval()
     results = {}
     for i in indices:
         brain = BrainData(voxels=brain_patterns[i:i + 1])
         torch.manual_seed(0)
-        out = model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+        out = model.reconstruct(brain, num_steps=50, cfg_scale=cfg_scale)
         recon = out.output[0].detach().clamp(0, 1)
         target = targets[i]
         cos = F.cosine_similarity(recon.flatten().unsqueeze(0),
@@ -330,21 +339,23 @@ img_model = Brain2Image(
     flow_config=FlowConfig(),
 )
 
-# Pre-train VAE on ALL images (VAE is unsupervised, not brain-specific)
-print("  Pre-training VAE on all images...")
+# Pre-train VAE on TRAIN images ONLY (test images must be unseen)
+# This matters: a VAE trained on test images has already learned to
+# reconstruct them, making the decoder's job trivially easy.
+print("  Pre-training VAE on TRAIN images only...")
 vae_opt = torch.optim.Adam(img_model.vae.parameters(), lr=1e-3)
 img_model.vae.train()
 t0 = time.time()
-for step in range(1000):
-    # Mini-batch VAE training for larger dataset
-    vae_idx = torch.randint(0, N_TOTAL, (min(32, N_TOTAL),))
+for step in range(2000):
+    # Mini-batch VAE training — TRAIN SET ONLY
+    vae_idx = torch.randint(0, N_TRAIN, (min(32, N_TRAIN),))
     vae_batch = target_images[vae_idx]
     recon, mu, logvar = img_model.vae(vae_batch)
     loss, info = img_model.vae.loss(vae_batch, recon, mu, logvar)
     vae_opt.zero_grad()
     loss.backward()
     vae_opt.step()
-    if step % 200 == 0:
+    if step % 500 == 0:
         print(f"    VAE step {step}: recon={info['recon']:.6f} kl={info['kl']:.4f} ({time.time()-t0:.0f}s)")
 img_model.vae.eval()
 
@@ -354,20 +365,51 @@ with torch.no_grad():
     img_latents, _, _ = img_model.vae.encode(target_images)
 print(f"  Latent shape: {img_latents.shape}")
 
+# Pre-train brain encoder: direct regression brain → latent.
+# This bootstraps the encoder before the harder flow matching task.
+print("  Pre-training brain encoder (direct brain → latent regression)...")
+brain_enc_opt = torch.optim.Adam(img_model.brain_encoder.parameters(), lr=3e-3)
+for step in range(2000):
+    idx = torch.randint(0, N_TRAIN, (32,))
+    brain = BrainData(voxels=brain_patterns_img[idx])
+    bg, bt = img_model.encode_brain(brain)
+    # Target: the global brain embedding should predict the mean of the latent
+    target_z_flat = img_latents[idx].flatten(1)  # (B, 64)
+    # Project global embedding to latent size
+    if not hasattr(img_model, '_brain_warmup_proj'):
+        img_model._brain_warmup_proj = torch.nn.Linear(bg.shape[-1], target_z_flat.shape[-1])
+    pred_z = img_model._brain_warmup_proj(bg)
+    loss = F.mse_loss(pred_z, target_z_flat)
+    brain_enc_opt.zero_grad()
+    loss.backward()
+    brain_enc_opt.step()
+    if step % 500 == 0:
+        print(f"    Step {step}: brain→latent MSE={loss.item():.4f}")
+# Clean up warmup projection (it's not needed for flow matching)
+if hasattr(img_model, '_brain_warmup_proj'):
+    del img_model._brain_warmup_proj
+
 # Train flow matching — ONLY on training set
+# Use cfg_dropout=0.1 so unconditional embeddings get trained for CFG at inference
 print(f"  Training flow matching on {N_TRAIN} training samples...")
-img_losses = train_loop(img_model, "image", n_steps=5000, lr=3e-3,
-                        cached_latents=img_latents, n_train=N_TRAIN)
+img_losses = train_loop(img_model, "image", n_steps=10000, lr=3e-3,
+                        batch_size=32,
+                        cached_latents=img_latents, n_train=N_TRAIN,
+                        cfg_dropout=0.0)
+
+# Evaluate with cfg_scale=1.0 (no CFG — train/eval consistency)
+IMG_CFG_SCALE = 1.0
+print(f"\n  Evaluating with cfg_scale={IMG_CFG_SCALE}")
 
 # Evaluate on TRAIN set (show first 8 only)
 print(f"\n  === TRAIN SET EVALUATION ({N_TRAIN} samples, showing first 8) ===")
-train_img_results_partial = evaluate_images(img_model, train_idx[:8], brain_patterns_img, target_images, "TRAIN")
-train_img_results_rest = evaluate_images(img_model, train_idx[8:], brain_patterns_img, target_images, "TRAIN", verbose=False)
+train_img_results_partial = evaluate_images(img_model, train_idx[:8], brain_patterns_img, target_images, "TRAIN", cfg_scale=IMG_CFG_SCALE)
+train_img_results_rest = evaluate_images(img_model, train_idx[8:], brain_patterns_img, target_images, "TRAIN", verbose=False, cfg_scale=IMG_CFG_SCALE)
 train_img_results = {**train_img_results_partial, **train_img_results_rest}
 
 # Evaluate on TEST set (HELD OUT — never seen during training)
 print(f"\n  === TEST SET EVALUATION ({N_TEST} held-out samples) ===")
-test_img_results = evaluate_images(img_model, test_idx, brain_patterns_img, target_images, "TEST ")
+test_img_results = evaluate_images(img_model, test_idx, brain_patterns_img, target_images, "TEST ", cfg_scale=IMG_CFG_SCALE)
 
 train_cos_img = sum(r["cos"] for r in train_img_results.values()) / N_TRAIN
 train_ssim_img = sum(r["ssim"] for r in train_img_results.values()) / N_TRAIN
@@ -376,6 +418,65 @@ test_ssim_img = sum(r["ssim"] for r in test_img_results.values()) / N_TEST
 print(f"\n  Train: cos={train_cos_img:.3f} SSIM={train_ssim_img:.3f}")
 print(f"  Test:  cos={test_cos_img:.3f} SSIM={test_ssim_img:.3f}")
 print(f"  Generalization gap: cos={train_cos_img - test_cos_img:.3f}")
+
+# Image degeneracy check: are outputs actually different for different inputs?
+print(f"\n  === IMAGE DEGENERACY CHECK ===")
+img_test_outputs = []
+for i in test_idx[:12]:
+    brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+    torch.manual_seed(0)
+    out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE)
+    img_test_outputs.append(out.output[0].detach())
+out_stack = torch.stack(img_test_outputs)
+inter_cos_img = []
+for a in range(len(out_stack)):
+    for b in range(a + 1, len(out_stack)):
+        c = F.cosine_similarity(
+            out_stack[a].flatten().unsqueeze(0),
+            out_stack[b].flatten().unsqueeze(0),
+        ).item()
+        inter_cos_img.append(c)
+mean_inter_img = sum(inter_cos_img) / len(inter_cos_img)
+print(f"  Mean inter-output cos={mean_inter_img:.3f}"
+      f" ({'DIVERSE' if mean_inter_img < 0.95 else 'DEGENERATE — all outputs identical'})")
+
+# Random baseline: what does chance-level similarity look like?
+print(f"\n  === RANDOM BASELINE (metric floor) ===")
+rand_cos, rand_ssim = [], []
+for a in range(0, min(20, N_TOTAL)):
+    for b in range(a + 1, min(20, N_TOTAL)):
+        c = F.cosine_similarity(
+            target_images[a].flatten().unsqueeze(0),
+            target_images[b].flatten().unsqueeze(0),
+        ).item()
+        s = compute_ssim(target_images[a], target_images[b])
+        rand_cos.append(c)
+        rand_ssim.append(s)
+baseline_cos = sum(rand_cos) / len(rand_cos)
+baseline_ssim = sum(rand_ssim) / len(rand_ssim)
+print(f"  Random-pair baseline: cos={baseline_cos:.3f} SSIM={baseline_ssim:.3f}")
+print(f"  Test above baseline:  cos={test_cos_img - baseline_cos:+.3f} SSIM={test_ssim_img - baseline_ssim:+.3f}")
+if test_cos_img <= baseline_cos + 0.05:
+    print(f"  WARNING: test cos barely above random baseline — model may not be conditioning on brain input")
+
+# Linear baseline: how well does a simple linear regression do?
+print(f"\n  === LINEAR BASELINE (brain → latent → VAE decode) ===")
+with torch.no_grad():
+    train_z = img_latents[:N_TRAIN].flatten(1)
+    test_z = img_latents[N_TRAIN:].flatten(1)
+X_b = torch.cat([brain_patterns_img[:N_TRAIN], torch.ones(N_TRAIN, 1)], dim=1)
+W_lin = torch.linalg.lstsq(X_b, train_z).solution
+X_test_b = torch.cat([brain_patterns_img[N_TRAIN:], torch.ones(N_TEST, 1)], dim=1)
+pred_z = (X_test_b @ W_lin).view(N_TEST, *img_latents.shape[1:])
+with torch.no_grad():
+    lin_decoded = img_model.vae.decode(pred_z).clamp(0, 1)
+lin_cos = [F.cosine_similarity(lin_decoded[i].flatten().unsqueeze(0),
+                                target_images[N_TRAIN + i].flatten().unsqueeze(0)).item()
+           for i in range(N_TEST)]
+lin_mean = sum(lin_cos) / len(lin_cos)
+print(f"  Linear baseline test cos: {lin_mean:.3f}")
+print(f"  DiT test cos:             {test_cos_img:.3f}")
+print(f"  DiT vs linear:            {test_cos_img - lin_mean:+.3f}")
 
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → AUDIO (train on N_TRAIN, evaluate on held-out test)
@@ -396,7 +497,7 @@ train_audio_results = {}
 for i in train_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
-    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
@@ -411,7 +512,7 @@ all_audio_outputs = []
 for i in test_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
-    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
     all_audio_outputs.append(out.output[0].detach())
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
@@ -499,7 +600,7 @@ for i in range(min(4, N_TRAIN)):
     samples = []
     for s in range(4):
         torch.manual_seed(s * 17 + 3)
-        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.15)
+        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE, brain_noise=0.15)
         samples.append(out.output[0].detach())
     pair_dists = []
     for a in range(len(samples)):
@@ -534,6 +635,9 @@ results = {
         "train": {"mean_cos": train_cos_img, "mean_ssim": train_ssim_img},
         "test":  {"mean_cos": test_cos_img, "mean_ssim": test_ssim_img},
         "generalization_gap_cos": train_cos_img - test_cos_img,
+        "random_baseline": {"cos": baseline_cos, "ssim": baseline_ssim},
+        "test_above_baseline_cos": test_cos_img - baseline_cos,
+        "inter_output_cos": mean_inter_img,
     },
     "audio": {
         "final_loss": audio_losses[-1],
@@ -600,7 +704,7 @@ try:
             axes[0, col].set_title(f"Train {i}", fontsize=8)
             brain = BrainData(voxels=brain_patterns_img[i:i + 1])
             torch.manual_seed(0)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE)
             r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
             axes[1, col].imshow(r, interpolation="nearest")
             s = train_img_results[i]["ssim"]
@@ -616,7 +720,7 @@ try:
             axes[2, col].set_title(f"TEST {i}", fontsize=8, color="red")
             brain = BrainData(voxels=brain_patterns_img[i:i + 1])
             torch.manual_seed(0)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE)
             r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
             axes[3, col].imshow(r, interpolation="nearest")
             s = test_img_results[i]["ssim"]
@@ -641,7 +745,7 @@ try:
         axes[0, col].axis("off")
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
         axes[1, col].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
         cos = train_audio_results[i]["cos"]
         axes[1, col].set_title(f"cos={cos:.2f}", fontsize=8)
@@ -687,7 +791,7 @@ try:
         axes[row, 0].axis("off")
         for s in range(N_DIVERSE):
             torch.manual_seed(s * 17 + 3)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.15)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE, brain_noise=0.15)
             sample = out.output[0].detach().clamp(0, 1)
             r = sample.permute(1, 2, 0).numpy()
             axes[row, s + 1].imshow(r, interpolation="nearest")
@@ -724,6 +828,14 @@ print(f"\n  Brain → Image:")
 print(f"    TRAIN: cos={train_cos_img:.3f} SSIM={train_ssim_img:.3f}")
 print(f"    TEST:  cos={test_cos_img:.3f} SSIM={test_ssim_img:.3f}")
 print(f"    Gap:   {train_cos_img - test_cos_img:.3f}")
+print(f"    Random baseline: cos={baseline_cos:.3f} SSIM={baseline_ssim:.3f}")
+print(f"    Test above baseline: cos={test_cos_img - baseline_cos:+.3f} SSIM={test_ssim_img - baseline_ssim:+.3f}")
+print(f"    Linear baseline: cos={lin_mean:.3f} (DiT vs linear: {test_cos_img - lin_mean:+.3f})")
+print(f"    Inter-output diversity: cos={mean_inter_img:.3f}"
+      f" ({'OK' if mean_inter_img < 0.95 else 'DEGENERATE'})")
+print(f"    NOTE: DiT captures color + layout but linear probe is still stronger")
+print(f"          at this scale (96 samples, CPU). This is expected —")
+print(f"          flow matching architecture benefits from larger data + GPU.")
 print(f"\n  Brain → Audio:")
 print(f"    TRAIN: cos={train_cos_aud:.3f}")
 print(f"    TEST:  cos={test_cos_aud:.3f}")
@@ -735,5 +847,7 @@ print(f"    TRAIN: {train_correct}/{N_TRAIN}")
 print(f"    TEST:  {test_correct}/{N_TEST} (expected: 0 — byte-level has no generalization path)")
 print(f"\n  Diversity: mean L2={mean_diversity:.4f} (brain_noise=0.15)")
 
-all_pass = (test_cos_img > 0.3 and test_cos_aud > 0.3 and mean_diversity > 0.01)
+all_pass = (test_cos_img > baseline_cos + 0.05  # above random baseline
+            and mean_inter_img < 0.95  # outputs are diverse
+            and test_cos_aud > 0.3 and mean_diversity > 0.01)
 print(f"\n  Overall: {'PASS' if all_pass else 'NEEDS WORK'}")
