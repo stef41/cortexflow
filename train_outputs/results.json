@@ -7,37 +7,37 @@
   },
   "n_voxels": 512,
   "image": {
-    "final_loss": 0.023561,
+    "final_loss": 0.01603,
     "train": {
-      "mean_cos": 0.997625,
-      "mean_ssim": 0.987798
+      "mean_cos": 0.997639,
+      "mean_ssim": 0.987376
     },
     "test": {
-      "mean_cos": 0.824903,
-      "mean_ssim": 0.364767
+      "mean_cos": 0.870591,
+      "mean_ssim": 0.433514
     },
-    "generalization_gap_cos": 0.172723,
+    "generalization_gap_cos": 0.127048,
     "random_baseline": {
       "cos": 0.68525,
       "ssim": 0.055577
     },
-    "test_above_baseline_cos": 0.139653,
-    "inter_output_cos": 0.771781
+    "test_above_baseline_cos": 0.185341,
+    "inter_output_cos": 0.949054
   },
   "audio": {
-    "final_loss": 0.012186,
+    "final_loss": 0.006033,
     "train": {
-      "mean_cos": 0.977059
+      "mean_cos": 0.97467
     },
     "test": {
-      "mean_cos": 0.84096
+      "mean_cos": 0.825706
     },
-    "generalization_gap_cos": 0.136099,
+    "generalization_gap_cos": 0.148963,
     "random_baseline_cos": 0.543702,
-    "test_above_baseline_cos": 0.297259
+    "test_above_baseline_cos": 0.282005
   },
   "text": {
-    "final_loss": 0.00066,
+    "final_loss": 0.001586,
     "train": {
       "exact_match": 86,
       "total": 96
@@ -47,40 +47,40 @@
       "total": 24
     },
     "results": {
-      "jig": "time",
-      "lark": "harp",
-      "malt": "salt",
+      "jig": "twig",
+      "lark": "haze",
+      "malt": "palm",
       "nib": "iron",
-      "orb": "bork",
-      "peg": "yewl",
-      "rye": "pyre",
-      "sap": "oath",
-      "tar": "star",
-      "urn": "urnk",
-      "vow": "dove",
-      "web": "ewew",
-      "yam": "palm",
-      "zest": "quiz",
-      "aloe": "lake",
-      "chop": "pove",
-      "dusk": "doar",
+      "orb": "rose",
+      "peg": "lime",
+      "rye": "fern",
+      "sap": "salt",
+      "tar": "bark",
+      "urn": "urne",
+      "vow": "cove",
+      "web": "ewed",
+      "yam": "gapp",
+      "zest": "satk",
+      "aloe": "vale",
+      "chop": "ooch",
+      "dusk": "dost",
       "elk": "kelp",
-      "fox": "gold",
-      "gum": "glen",
-      "hut": "tusk",
-      "jab": "arch",
-      "keg": "knet",
-      "lid": "silk"
+      "fox": "echo",
+      "gum": "tree",
+      "hut": "dust",
+      "jab": "baze",
+      "keg": "kite",
+      "lid": "jide"
     }
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.092171,
+    "mean_l2": 0.060426,
     "per_input": [
-      0.129673,
-      0.042472,
-      0.056149,
-      0.140389
+      0.064248,
+      0.04939,
+      0.020659,
+      0.107407
     ]
   }
 }

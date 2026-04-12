@@ -32,6 +32,7 @@ from cortexflow import (
 )
 from cortexflow._types import DiTConfig, VAEConfig, FlowConfig
 from cortexflow.brain2img import Brain2Image
+from cortexflow.flow_matching import EMAModel
 
 # neuroprobe provides the forward encoding model (stimulus → brain)
 from neuroprobe.media import (
@@ -299,7 +300,7 @@ def make_batch(indices, modality="image"):
 
 def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
                cached_latents=None, n_train=N_TRAIN, cfg_dropout=0.0,
-               noise_augment=0.0):
+               noise_augment=0.0, use_ema=False, augment_flip=False):
     """Training loop — only samples from TRAINING set indices."""
     if cached_latents is not None:
         params = [p for n, p in model.named_parameters()
@@ -311,6 +312,9 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     model.train()
     losses = []
     t0 = time.time()
+
+    # EMA: use slightly lower decay for small datasets (tracks faster)
+    ema = EMAModel(model, decay=0.999) if use_ema else None
 
     for step in range(n_steps):
         idx = torch.randint(0, n_train, (batch_size,))  # ONLY train indices
@@ -326,6 +330,11 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
 
         if cached_latents is not None and modality in ("image", "audio"):
             z = cached_latents[idx]
+            # Random horizontal flip augmentation for images
+            if augment_flip and modality == "image" and z.dim() == 4:
+                flip_mask = torch.rand(z.shape[0]) < 0.5
+                z = z.clone()
+                z[flip_mask] = z[flip_mask].flip(-1)
             bg, bt = model.encode_brain(brain)
             # Apply CFG dropout: randomly replace conditioning with unconditional
             if cfg_dropout > 0 and hasattr(model, 'uncond_global'):
@@ -351,24 +360,70 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
         scheduler.step()
         losses.append(loss.item())
 
+        if ema is not None:
+            ema.update(model)
+
         if step % 500 == 0 or step == n_steps - 1:
             elapsed = time.time() - t0
             avg = sum(losses[-50:]) / min(50, len(losses))
             print(f"  Step {step:5d}/{n_steps}: loss={loss.item():.4f} avg50={avg:.4f} "
                   f"lr={scheduler.get_last_lr()[0]:.2e} ({elapsed:.0f}s)")
 
+    # Apply EMA weights for evaluation
+    if ema is not None:
+        ema.apply_to(model)
+        print(f"  Applied EMA weights (decay=0.999)")
+
     return losses
 
 
-def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True, cfg_scale=1.0):
-    """Evaluate image reconstructions with cos, SSIM, L2."""
+def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True,
+                    cfg_scale=1.0, n_avg=1, linear_preds=None, latent_shape=None):
+    """Evaluate image reconstructions with cos, SSIM, L2.
+    n_avg: average this many samples per brain pattern to reduce sampling variance.
+    linear_preds: if provided, add linear prediction to DiT output (residual mode).
+           The DiT samples a residual in latent space, and we add linear_preds before VAE decode.
+    latent_shape: single latent shape (C,H,W). Required for residual mode or n_avg>1.
+    """
     model.eval()
     results = {}
     for i in indices:
         brain = BrainData(voxels=brain_patterns[i:i + 1])
-        torch.manual_seed(0)
-        out = model.reconstruct(brain, num_steps=50, cfg_scale=cfg_scale)
-        recon = out.output[0].detach().clamp(0, 1)
+
+        if linear_preds is not None or n_avg > 1:
+            # Work in latent space directly for residual mode / averaging
+            bg, bt = model.encode_brain(brain)
+            shape_1 = (1,) + tuple(latent_shape)
+            if n_avg > 1:
+                latent_sum = None
+                for s in range(n_avg):
+                    torch.manual_seed(s)
+                    z = model.flow_matcher.sample(
+                        model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=cfg_scale,
+                    )
+                    if linear_preds is not None:
+                        z = z + linear_preds[i:i + 1]
+                    if latent_sum is None:
+                        latent_sum = z
+                    else:
+                        latent_sum = latent_sum + z
+                avg_z = latent_sum / n_avg
+                with torch.no_grad():
+                    recon = model.vae.decode(avg_z)[0].detach().clamp(0, 1)
+            else:
+                torch.manual_seed(0)
+                z = model.flow_matcher.sample(
+                    model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=cfg_scale,
+                )
+                if linear_preds is not None:
+                    z = z + linear_preds[i:i + 1]
+                with torch.no_grad():
+                    recon = model.vae.decode(z)[0].detach().clamp(0, 1)
+        else:
+            torch.manual_seed(0)
+            out = model.reconstruct(brain, num_steps=50, cfg_scale=cfg_scale)
+            recon = out.output[0].detach().clamp(0, 1)
+
         target = targets[i]
         cos = F.cosine_similarity(recon.flatten().unsqueeze(0),
                                    target.flatten().unsqueeze(0)).item()
@@ -421,6 +476,21 @@ with torch.no_grad():
     img_latents, _, _ = img_model.vae.encode(target_images)
 print(f"  Latent shape: {img_latents.shape}")
 
+# Compute linear brain→latent mapping on TRAINING data
+# This serves dual purpose: (1) baseline comparison, (2) residual targets for DiT
+print("  Computing linear brain→latent mapping (train only)...")
+train_z = img_latents[:N_TRAIN].flatten(1)
+X_b_train = torch.cat([brain_patterns_img[:N_TRAIN], torch.ones(N_TRAIN, 1)], dim=1)
+W_img_lin = torch.linalg.lstsq(X_b_train, train_z).solution
+# Linear predictions for ALL samples (train + test)
+X_b_all = torch.cat([brain_patterns_img, torch.ones(N_TOTAL, 1)], dim=1)
+img_lin_preds = (X_b_all @ W_img_lin).view(N_TOTAL, *img_latents.shape[1:])
+# Residuals: what linear gets wrong
+img_residuals = img_latents - img_lin_preds
+residual_scale = img_residuals[:N_TRAIN].flatten(1).std().item()
+print(f"  Linear pred MSE (train): {F.mse_loss(img_lin_preds[:N_TRAIN], img_latents[:N_TRAIN]).item():.4f}")
+print(f"  Residual scale: {residual_scale:.4f}")
+
 # Pre-train brain encoder: direct regression brain → latent.
 # This bootstraps the encoder before the harder flow matching task.
 print("  Pre-training brain encoder (direct brain → latent regression)...")
@@ -445,27 +515,46 @@ for step in range(2000):
 if hasattr(img_model, '_brain_warmup_proj'):
     del img_model._brain_warmup_proj
 
-# Train flow matching — ONLY on training set
-# noise_augment=0.1 simulates fMRI measurement noise → reduces overfitting
-print(f"  Training flow matching on {N_TRAIN} training samples...")
+# Train flow matching on RESIDUALS — what linear gets wrong.
+# The DiT learns to predict the nonlinear correction that improves on
+# the linear baseline. At inference: final = linear_pred + DiT_sample.
+# This focuses the DiT's limited capacity on patterns linear MISSES.
+print(f"  Training flow matching on RESIDUALS (target - linear_pred)...")
 img_losses = train_loop(img_model, "image", n_steps=20000, lr=3e-3,
                         batch_size=32,
-                        cached_latents=img_latents, n_train=N_TRAIN,
-                        cfg_dropout=0.0, noise_augment=0.1)
+                        cached_latents=img_residuals, n_train=N_TRAIN,
+                        cfg_dropout=0.0, noise_augment=0.1,
+                        use_ema=True)
 
-# Evaluate with cfg_scale=1.0 (no CFG — train/eval consistency)
+# Evaluate residual DiT: sample residual + add linear prediction
+# Multi-sample averaging (n_avg=8): reduces sampling variance
 IMG_CFG_SCALE = 1.0
-print(f"\n  Evaluating with cfg_scale={IMG_CFG_SCALE}")
+N_AVG = 8
+IMG_LATENT_SHAPE = tuple(img_latents.shape[1:])  # (4, 4, 4) or similar
+print(f"\n  Evaluating RESIDUAL DiT with cfg_scale={IMG_CFG_SCALE}, n_avg={N_AVG}")
+print(f"  (DiT generates residual in latent space, added to linear prediction)")
 
 # Evaluate on TRAIN set (show first 8 only)
 print(f"\n  === TRAIN SET EVALUATION ({N_TRAIN} samples, showing first 8) ===")
-train_img_results_partial = evaluate_images(img_model, train_idx[:8], brain_patterns_img, target_images, "TRAIN", cfg_scale=IMG_CFG_SCALE)
-train_img_results_rest = evaluate_images(img_model, train_idx[8:], brain_patterns_img, target_images, "TRAIN", verbose=False, cfg_scale=IMG_CFG_SCALE)
+train_img_results_partial = evaluate_images(
+    img_model, train_idx[:8], brain_patterns_img, target_images, "TRAIN",
+    cfg_scale=IMG_CFG_SCALE, n_avg=N_AVG, linear_preds=img_lin_preds,
+    latent_shape=IMG_LATENT_SHAPE,
+)
+train_img_results_rest = evaluate_images(
+    img_model, train_idx[8:], brain_patterns_img, target_images, "TRAIN",
+    verbose=False, cfg_scale=IMG_CFG_SCALE, n_avg=N_AVG, linear_preds=img_lin_preds,
+    latent_shape=IMG_LATENT_SHAPE,
+)
 train_img_results = {**train_img_results_partial, **train_img_results_rest}
 
 # Evaluate on TEST set (HELD OUT — never seen during training)
 print(f"\n  === TEST SET EVALUATION ({N_TEST} held-out samples) ===")
-test_img_results = evaluate_images(img_model, test_idx, brain_patterns_img, target_images, "TEST ", cfg_scale=IMG_CFG_SCALE)
+test_img_results = evaluate_images(
+    img_model, test_idx, brain_patterns_img, target_images, "TEST ",
+    cfg_scale=IMG_CFG_SCALE, n_avg=N_AVG, linear_preds=img_lin_preds,
+    latent_shape=IMG_LATENT_SHAPE,
+)
 
 train_cos_img = sum(r["cos"] for r in train_img_results.values()) / N_TRAIN
 train_ssim_img = sum(r["ssim"] for r in train_img_results.values()) / N_TRAIN
@@ -516,14 +605,10 @@ if test_cos_img <= baseline_cos + 0.05:
     print(f"  WARNING: test cos barely above random baseline — model may not be conditioning on brain input")
 
 # Linear baseline: how well does a simple linear regression do?
+# (Linear mapping was already computed above for residual training)
 print(f"\n  === LINEAR BASELINE (brain → latent → VAE decode) ===")
-with torch.no_grad():
-    train_z = img_latents[:N_TRAIN].flatten(1)
-    test_z = img_latents[N_TRAIN:].flatten(1)
-X_b = torch.cat([brain_patterns_img[:N_TRAIN], torch.ones(N_TRAIN, 1)], dim=1)
-W_lin = torch.linalg.lstsq(X_b, train_z).solution
 X_test_b = torch.cat([brain_patterns_img[N_TRAIN:], torch.ones(N_TEST, 1)], dim=1)
-pred_z = (X_test_b @ W_lin).view(N_TEST, *img_latents.shape[1:])
+pred_z = (X_test_b @ W_img_lin).view(N_TEST, *img_latents.shape[1:])
 with torch.no_grad():
     lin_decoded = img_model.vae.decode(pred_z).clamp(0, 1)
 lin_cos = [F.cosine_similarity(lin_decoded[i].flatten().unsqueeze(0),
@@ -531,8 +616,9 @@ lin_cos = [F.cosine_similarity(lin_decoded[i].flatten().unsqueeze(0),
            for i in range(N_TEST)]
 lin_mean = sum(lin_cos) / len(lin_cos)
 print(f"  Linear baseline test cos: {lin_mean:.3f}")
-print(f"  DiT test cos:             {test_cos_img:.3f}")
+print(f"  Residual DiT test cos:    {test_cos_img:.3f}")
 print(f"  DiT vs linear:            {test_cos_img - lin_mean:+.3f}")
+warm_start_used = False  # replaced by residual approach
 
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → AUDIO (train on N_TRAIN, evaluate on held-out test)
@@ -540,6 +626,9 @@ print(f"  DiT vs linear:            {test_cos_img - lin_mean:+.3f}")
 print("\n" + "=" * 70)
 print("TRAINING BRAIN → AUDIO")
 print("=" * 70)
+
+# Fix random state so audio results are consistent regardless of image training
+torch.manual_seed(123)
 
 # Check mel target diversity first
 mel_inter_target = []
@@ -662,21 +751,35 @@ if hasattr(audio_model, '_aud_warmup_proj'):
     del audio_model._aud_warmup_proj
 
 # Flow matching in mel LATENT space (same approach as image pipeline)
+# EMA for audio too, but no CFG (not helpful at 96 samples)
 audio_losses = train_loop(audio_model, "audio", n_steps=10000, lr=3e-3,
                           n_train=N_TRAIN, noise_augment=0.1, batch_size=32,
-                          cached_latents=mel_latents)
+                          cached_latents=mel_latents,
+                          use_ema=True)
 
 audio_model.eval()
 
 # Evaluate: reconstruct latent → VAE decode → compare to target mel
+# Multi-sample averaging (n_avg=8) for audio too
+AUD_CFG_SCALE = 1.0
+AUD_N_AVG = 8
+print(f"\n  Evaluating with cfg_scale={AUD_CFG_SCALE}, n_avg={AUD_N_AVG}")
 print(f"\n  === TRAIN SET (showing first 8 of {N_TRAIN}) ===")
 train_audio_results = {}
 for i in train_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
-    torch.manual_seed(0)
-    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
+    # Average multiple samples in latent space
+    latent_sum = None
+    for s in range(AUD_N_AVG):
+        torch.manual_seed(s)
+        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
+        if latent_sum is None:
+            latent_sum = out.output
+        else:
+            latent_sum = latent_sum + out.output
+    avg_latent = latent_sum / AUD_N_AVG
     with torch.no_grad():
-        mel_recon = mel_vae.decode(out.output)
+        mel_recon = mel_vae.decode(avg_latent)
     cos = F.cosine_similarity(
         mel_recon.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
@@ -690,10 +793,18 @@ test_audio_results = {}
 all_audio_outputs = []
 for i in test_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
-    torch.manual_seed(0)
-    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
+    # Average multiple samples in latent space
+    latent_sum = None
+    for s in range(AUD_N_AVG):
+        torch.manual_seed(s)
+        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
+        if latent_sum is None:
+            latent_sum = out.output
+        else:
+            latent_sum = latent_sum + out.output
+    avg_latent = latent_sum / AUD_N_AVG
     with torch.no_grad():
-        mel_recon = mel_vae.decode(out.output)
+        mel_recon = mel_vae.decode(avg_latent)
     all_audio_outputs.append(mel_recon[0].detach())
     cos = F.cosine_similarity(
         mel_recon.flatten().unsqueeze(0),
@@ -773,6 +884,8 @@ if aud_r2 < 0:
 print("\n" + "=" * 70)
 print("TRAINING BRAIN → TEXT")
 print("=" * 70)
+
+torch.manual_seed(456)
 
 text_model = build_brain2text(
     n_voxels=N_VOXELS, max_len=8, hidden_dim=64, depth=3,
@@ -972,7 +1085,7 @@ try:
         axes[0, col].axis("off")
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
+        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
         with torch.no_grad():
             mel_recon = mel_vae.decode(out.output)
         axes[1, col].imshow(mel_recon[0].detach().numpy(), aspect="auto", origin="lower")
@@ -1062,9 +1175,12 @@ print(f"    Test above baseline: cos={test_cos_img - baseline_cos:+.3f} SSIM={te
 print(f"    Linear baseline: cos={lin_mean:.3f} (DiT vs linear: {test_cos_img - lin_mean:+.3f})")
 print(f"    Inter-output diversity: cos={mean_inter_img:.3f}"
       f" ({'OK' if mean_inter_img < 0.95 else 'DEGENERATE'})")
-print(f"    NOTE: DiT captures color + layout but linear probe is still stronger")
-print(f"          at this scale (96 samples, CPU). At larger data scales,")
-print(f"          the flow matching architecture's non-linear path outperforms linear.")
+if test_cos_img > lin_mean:
+    print(f"    DiT BEATS linear baseline! Residual DiT + EMA + multi-sample averaging.")
+else:
+    print(f"    NOTE: DiT captures color + layout but linear probe is still stronger")
+    print(f"          at this scale (96 samples, CPU). At larger data scales,")
+    print(f"          the flow matching architecture's non-linear path outperforms linear.")
 print(f"\n  Brain → Audio (mel VAE + flow matching in latent space):")
 print(f"    TRAIN: cos={train_cos_aud:.3f}")
 print(f"    TEST:  cos={test_cos_aud:.3f}")
