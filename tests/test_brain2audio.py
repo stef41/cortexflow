@@ -91,6 +91,26 @@ class TestBrain2Audio:
         assert result.output.shape[0] == 1
 
 
+    def test_reconstruct_num_samples(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=3)
+        assert result.output.shape == (BATCH, 3, N_MELS, AUDIO_LEN)
+        assert result.metadata["num_samples"] == 3
+
+    def test_diverse_audio_samples_differ(self, model, brain_data):
+        """Multiple audio samples from same brain input should differ."""
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=2)
+        sample_0 = result.output[:, 0]
+        sample_1 = result.output[:, 1]
+        assert not torch.allclose(sample_0, sample_1), "Diverse samples should differ"
+
+    def test_reconstruct_num_samples_1(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=1)
+        assert result.output.shape == (BATCH, N_MELS, AUDIO_LEN)
+
+
 class TestMelToWaveform:
     def test_output_shape(self):
         mel = torch.rand(1, N_MELS, 16).abs() + 0.01

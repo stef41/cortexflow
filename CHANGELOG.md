@@ -2,6 +2,14 @@
 
 All notable changes to CortexFlow will be documented in this file.
 
+## [0.2.0] - 2026-04-12
+
+### Added
+
+- **Semantic diversity**: All pipelines now support `num_samples` parameter to generate multiple diverse reconstructions per brain input. Each sample uses independent noise (image/audio) or independent random draws (text), producing semantically varied outputs.
+- **Nucleus (top-p) sampling** for Brain2Text: `top_p` parameter enables nucleus filtering alongside top-k, giving finer control over text generation diversity.
+- When `num_samples > 1`, output shapes become `(B, num_samples, ...)` for image/audio; text metadata returns grouped lists per brain input.
+
 ## [0.1.1] - 2025-06-26
 
 ### Fixed

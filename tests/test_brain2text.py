@@ -142,6 +142,54 @@ class TestBrain2Text:
         assert len(result.metadata["texts"]) == 1
 
 
+    def test_reconstruct_num_samples(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, max_len=8, num_samples=3)
+        texts = result.metadata["texts"]
+        assert len(texts) == BATCH
+        for group in texts:
+            assert isinstance(group, list)
+            assert len(group) == 3
+            for t in group:
+                assert isinstance(t, str)
+
+    def test_diverse_text_samples_differ(self, model, brain_data):
+        """Multiple text samples from same brain input should differ."""
+        model.eval()
+        # High temperature for max diversity
+        result = model.reconstruct(
+            brain_data, max_len=8, temperature=1.5, num_samples=4,
+        )
+        texts = result.metadata["texts"]
+        # At least one brain input should produce non-identical samples
+        any_differ = False
+        for group in texts:
+            if len(set(group)) > 1:
+                any_differ = True
+                break
+        assert any_differ, "At high temperature, diverse samples should differ"
+
+    def test_reconstruct_top_p(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, max_len=8, top_p=0.9, top_k=0)
+        assert result.output.shape[0] == BATCH
+        assert len(result.metadata["texts"]) == BATCH
+
+    def test_reconstruct_top_p_and_top_k(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, max_len=8, top_p=0.9, top_k=20)
+        assert result.output.shape[0] == BATCH
+
+    def test_reconstruct_num_samples_1(self, model, brain_data):
+        """num_samples=1 should return flat list of strings."""
+        model.eval()
+        result = model.reconstruct(brain_data, max_len=8, num_samples=1)
+        texts = result.metadata["texts"]
+        assert len(texts) == BATCH
+        for t in texts:
+            assert isinstance(t, str)
+
+
 class TestBuildBrain2Text:
     def test_default_build(self):
         model = build_brain2text(n_voxels=64, max_len=16, hidden_dim=16, depth=1)

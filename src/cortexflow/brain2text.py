@@ -221,6 +221,8 @@ class Brain2Text(nn.Module):
         max_len: int | None = None,
         temperature: float = 0.8,
         top_k: int = 50,
+        top_p: float = 0.0,
+        num_samples: int = 1,
     ) -> ReconstructionResult:
         """Reconstruct text from brain activity via autoregressive decoding.
 
@@ -228,7 +230,16 @@ class Brain2Text(nn.Module):
             brain_data: fMRI data to decode.
             max_len: Maximum generation length.
             temperature: Sampling temperature.
-            top_k: Top-k filtering.
+            top_k: Top-k filtering (0 to disable).
+            top_p: Nucleus sampling threshold (0.0 to disable). When set,
+                only the smallest set of tokens with cumulative probability
+                >= ``top_p`` are kept. Promotes semantic diversity.
+            num_samples: Number of diverse samples per brain input.
+                Each sample decodes independently with different random
+                draws, producing semantically varied texts. When
+                ``num_samples > 1``, ``metadata["texts"]`` is a list of
+                lists: ``texts[i]`` contains ``num_samples`` strings for
+                brain input *i*.
 
         Returns:
             ReconstructionResult with generated text as metadata.
@@ -239,8 +250,14 @@ class Brain2Text(nn.Module):
 
         _, brain_tokens = self.brain_encoder(brain_data.voxels)
 
+        # Repeat conditioning for multiple samples per input
+        if num_samples > 1:
+            brain_tokens = brain_tokens.repeat_interleave(num_samples, dim=0)
+
+        BN = B * num_samples
+
         # Start with BOS token
-        generated = torch.full((B, 1), self.bos_token, dtype=torch.long, device=device)
+        generated = torch.full((BN, 1), self.bos_token, dtype=torch.long, device=device)
 
         for _ in range(gen_len - 1):
             logits = self.decoder(generated, brain_tokens)
@@ -248,9 +265,19 @@ class Brain2Text(nn.Module):
 
             # Top-k filtering
             if top_k > 0:
-                topk_vals, _ = next_logits.topk(top_k, dim=-1)
+                topk_vals, _ = next_logits.topk(min(top_k, next_logits.size(-1)), dim=-1)
                 threshold = topk_vals[:, -1].unsqueeze(-1)
                 next_logits = next_logits.masked_fill(next_logits < threshold, float("-inf"))
+
+            # Nucleus (top-p) filtering
+            if top_p > 0.0:
+                sorted_logits, sorted_idx = next_logits.sort(dim=-1, descending=True)
+                cum_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
+                # Remove tokens with cumulative probability above top_p
+                mask = cum_probs - sorted_logits.softmax(dim=-1) >= top_p
+                sorted_logits[mask] = float("-inf")
+                # Scatter back
+                next_logits = sorted_logits.scatter(1, sorted_idx, sorted_logits)
 
             probs = F.softmax(next_logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
@@ -261,13 +288,22 @@ class Brain2Text(nn.Module):
                 break
 
         # Decode to text (skip BOS token at position 0)
-        texts = [self.tokens_to_text(generated[i, 1:]) for i in range(B)]
+        if num_samples > 1:
+            # Group samples: texts[i] = list of num_samples strings
+            texts = []
+            for i in range(B):
+                group = []
+                for s in range(num_samples):
+                    group.append(self.tokens_to_text(generated[i * num_samples + s, 1:]))
+                texts.append(group)
+        else:
+            texts = [self.tokens_to_text(generated[i, 1:]) for i in range(B)]
 
         return ReconstructionResult(
             modality=Modality.TEXT,
             output=generated,
-            brain_condition=brain_tokens.mean(dim=1),
-            metadata={"texts": texts},
+            brain_condition=brain_tokens[:B].mean(dim=1),
+            metadata={"texts": texts, "num_samples": num_samples},
         )
 
 

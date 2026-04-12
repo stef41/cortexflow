@@ -211,25 +211,52 @@ class Brain2Audio(nn.Module):
         brain_data: BrainData,
         num_steps: int = 50,
         cfg_scale: float = 3.0,
+        num_samples: int = 1,
     ) -> ReconstructionResult:
-        """Reconstruct audio mel spectrogram from brain activity."""
+        """Reconstruct audio mel spectrogram from brain activity.
+
+        Args:
+            brain_data: fMRI data to decode.
+            num_steps: Number of ODE solver steps.
+            cfg_scale: Classifier-free guidance scale.
+            num_samples: Number of diverse samples per brain input.
+                Each sample uses independent noise, producing semantically
+                varied reconstructions. Output shape becomes
+                ``(B, num_samples, n_mels, T)`` when ``num_samples > 1``.
+
+        Returns:
+            ReconstructionResult with the decoded mel spectrogram(s).
+        """
         B = brain_data.batch_size
         device = brain_data.voxels.device
         brain_global, brain_tokens = self.brain_encoder(brain_data.voxels)
 
-        mel_shape = (B, self.n_mels, self.audio_len)
+        # Repeat conditioning for multiple samples per input
+        if num_samples > 1:
+            brain_global = brain_global.repeat_interleave(num_samples, dim=0)
+            brain_tokens = brain_tokens.repeat_interleave(num_samples, dim=0)
+
+        BN = B * num_samples
+
+        mel_shape = (BN, self.n_mels, self.audio_len)
         mel = self.flow_matcher.sample(
             self.dit, mel_shape, brain_global, brain_tokens,
             num_steps=num_steps, cfg_scale=cfg_scale,
-            brain_global_uncond=self.uncond_global.expand(B, -1),
-            brain_tokens_uncond=self.uncond_tokens.expand(B, -1, -1),
+            brain_global_uncond=self.uncond_global.expand(BN, -1),
+            brain_tokens_uncond=self.uncond_tokens.expand(BN, -1, -1),
         )
+
+        # Reshape to (B, num_samples, n_mels, T) when generating multiple
+        if num_samples > 1:
+            mel = mel.view(B, num_samples, self.n_mels, self.audio_len)
+
         return ReconstructionResult(
             modality=Modality.AUDIO,
             output=mel,
-            brain_condition=brain_global,
+            brain_condition=brain_global[:B],
             n_steps=num_steps,
             cfg_scale=cfg_scale,
+            metadata={"num_samples": num_samples},
         )
 
     @staticmethod

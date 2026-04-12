@@ -79,6 +79,27 @@ class TestBrain2Image:
         assert result.output.shape[0] == 1
 
 
+    def test_reconstruct_num_samples(self, model, brain_data):
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=3)
+        assert result.output.shape == (BATCH, 3, 3, IMG_SIZE, IMG_SIZE)
+        assert result.metadata["num_samples"] == 3
+
+    def test_diverse_samples_differ(self, model, brain_data):
+        """Multiple samples from same brain input should differ."""
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=2)
+        sample_0 = result.output[:, 0]
+        sample_1 = result.output[:, 1]
+        assert not torch.allclose(sample_0, sample_1), "Diverse samples should differ"
+
+    def test_reconstruct_num_samples_1(self, model, brain_data):
+        """num_samples=1 should behave like the default."""
+        model.eval()
+        result = model.reconstruct(brain_data, num_steps=2, num_samples=1)
+        assert result.output.shape == (BATCH, 3, IMG_SIZE, IMG_SIZE)
+
+
 class TestBuildBrain2Img:
     def test_default_build(self):
         model = build_brain2img(n_voxels=64, img_size=8, hidden_dim=16, depth=1, num_heads=4)

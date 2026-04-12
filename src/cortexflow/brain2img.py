@@ -154,6 +154,7 @@ class Brain2Image(nn.Module):
         brain_data: BrainData,
         num_steps: int = 50,
         cfg_scale: float = 4.0,
+        num_samples: int = 1,
     ) -> ReconstructionResult:
         """Reconstruct an image from brain activity.
 
@@ -161,9 +162,13 @@ class Brain2Image(nn.Module):
             brain_data: fMRI data to decode.
             num_steps: Number of ODE solver steps.
             cfg_scale: Classifier-free guidance scale.
+            num_samples: Number of diverse samples per brain input.
+                Each sample uses independent noise, producing semantically
+                varied reconstructions. Output shape becomes
+                ``(B, num_samples, C, H, W)`` when ``num_samples > 1``.
 
         Returns:
-            ReconstructionResult with the decoded image.
+            ReconstructionResult with the decoded image(s).
         """
         B = brain_data.batch_size
         device = brain_data.voxels.device
@@ -171,12 +176,19 @@ class Brain2Image(nn.Module):
         # Encode brain
         brain_global, brain_tokens = self.encode_brain(brain_data)
 
-        # Unconditional embeddings for CFG
-        uncond_global = self.uncond_global.expand(B, -1)
-        uncond_tokens = self.uncond_tokens.expand(B, -1, -1)
+        # Repeat conditioning for multiple samples per input
+        if num_samples > 1:
+            brain_global = brain_global.repeat_interleave(num_samples, dim=0)
+            brain_tokens = brain_tokens.repeat_interleave(num_samples, dim=0)
 
-        # Sample latents via flow matching
-        latent_shape = (B, self._latent_channels, self._latent_size, self._latent_size)
+        BN = B * num_samples
+
+        # Unconditional embeddings for CFG
+        uncond_global = self.uncond_global.expand(BN, -1)
+        uncond_tokens = self.uncond_tokens.expand(BN, -1, -1)
+
+        # Sample latents via flow matching (each gets independent noise)
+        latent_shape = (BN, self._latent_channels, self._latent_size, self._latent_size)
         z = self.flow_matcher.sample(
             self.dit,
             shape=latent_shape,
@@ -192,12 +204,18 @@ class Brain2Image(nn.Module):
         images = self.vae.decode(z)
         images = images.clamp(0, 1)
 
+        # Reshape to (B, num_samples, C, H, W) when generating multiple
+        if num_samples > 1:
+            C, H, W = images.shape[1:]
+            images = images.view(B, num_samples, C, H, W)
+
         return ReconstructionResult(
             modality=Modality.IMAGE,
             output=images,
-            brain_condition=brain_global,
+            brain_condition=brain_global[:B],
             n_steps=num_steps,
             cfg_scale=cfg_scale,
+            metadata={"num_samples": num_samples},
         )
 
 
