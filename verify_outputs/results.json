@@ -1,0 +1,76 @@
+{
+  "test1_conditioning": {
+    "loss_initial": 2.03115,
+    "loss_final": 1.80253,
+    "loss_min": 1.687195,
+    "L2_diff_AB": 0.130826,
+    "corr_A": 0.108727,
+    "corr_B": 0.447743,
+    "velocity_diff": 0.481865,
+    "embedding_diff": 1.331339,
+    "cos_AA": 0.232257,
+    "cos_AB": -0.056458,
+    "cos_BA": -0.092384,
+    "cos_BB": 0.237541,
+    "PASS_velocity_differs": true,
+    "PASS_outputs_differ": true,
+    "INFO_A_points_to_A": true,
+    "INFO_B_points_to_B": true
+  },
+  "test2_diversity": {
+    "l2_with_bn": 0.194949,
+    "l2_without_bn": 0.186152,
+    "cos_with_bn": 0.508608,
+    "cos_without_bn": 0.560152,
+    "amplification": 1.047255,
+    "corr_bn_to_A": 0.758941,
+    "corr_bn_to_B": 0.627468,
+    "emb_diversity": 2.103017,
+    "rel_diversity": 0.401619,
+    "PASS_embeddings_diverse": true,
+    "PASS_still_coherent": true
+  },
+  "test3_roi": {
+    "roi_outputs": {
+      "V1": {
+        "R": 0.208476,
+        "G": 0.178841,
+        "B": 0.068343
+      },
+      "FFA": {
+        "R": 0.218271,
+        "G": 0.177112,
+        "B": 0.059016
+      },
+      "A1": {
+        "R": 0.210672,
+        "G": 0.169949,
+        "B": 0.057614
+      }
+    },
+    "ablation_shifts": {
+      "V1": 0.021865,
+      "FFA": 0.004252,
+      "A1": 0.001317
+    },
+    "PASS_v1_largest_shift": true
+  },
+  "test4_text": {
+    "texts": [
+      "coww",
+      "carr",
+      "cup4",
+      "coww",
+      "cutt",
+      "cup4",
+      "carr",
+      "cup\ufffd",
+      "coww",
+      "cutt"
+    ],
+    "unique_prefixes": 4,
+    "in_vocab_count": 10,
+    "PASS_diverse": true,
+    "PASS_coherent": true
+  }
+}
