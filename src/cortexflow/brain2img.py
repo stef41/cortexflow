@@ -24,7 +24,7 @@ from cortexflow._types import (
     ReconstructionResult,
     VAEConfig,
 )
-from cortexflow.brain_encoder import BrainEncoder
+from cortexflow.brain_encoder import BrainEncoder, ROIBrainEncoder
 from cortexflow.dit import DiffusionTransformer
 from cortexflow.flow_matching import RectifiedFlowMatcher
 from cortexflow.vae import LatentVAE
@@ -58,6 +58,7 @@ class Brain2Image(nn.Module):
         vae_config: VAEConfig | None = None,
         flow_config: FlowConfig | None = None,
         n_brain_tokens: int = 16,
+        brain_encoder: nn.Module | None = None,
     ) -> None:
         super().__init__()
         self.img_size = img_size
@@ -72,12 +73,15 @@ class Brain2Image(nn.Module):
         n_downsample = len(vae_cfg.hidden_dims)
         latent_size = img_size // (2 ** n_downsample)
 
-        # Brain encoder
-        self.brain_encoder = BrainEncoder(
-            n_voxels=n_voxels,
-            cond_dim=dit_cfg.cond_dim,
-            n_tokens=n_brain_tokens,
-        )
+        # Brain encoder — custom or default
+        if brain_encoder is not None:
+            self.brain_encoder = brain_encoder
+        else:
+            self.brain_encoder = BrainEncoder(
+                n_voxels=n_voxels,
+                cond_dim=dit_cfg.cond_dim,
+                n_tokens=n_brain_tokens,
+            )
 
         # Unconditional embeddings for classifier-free guidance
         self.uncond_global = nn.Parameter(torch.zeros(1, dit_cfg.cond_dim))
@@ -106,7 +110,13 @@ class Brain2Image(nn.Module):
     def encode_brain(
         self, brain_data: BrainData
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Encode fMRI to conditioning signals."""
+        """Encode fMRI to conditioning signals.
+
+        Automatically dispatches to ``ROIBrainEncoder`` when per-ROI
+        voxels are provided.
+        """
+        if isinstance(self.brain_encoder, ROIBrainEncoder) and brain_data.roi_voxels is not None:
+            return self.brain_encoder(brain_data.roi_voxels)
         return self.brain_encoder(brain_data.voxels)
 
     def training_loss(
@@ -191,10 +201,12 @@ class Brain2Image(nn.Module):
         BN = B * num_samples
 
         # Perturb brain embeddings — each sample explores a different
-        # interpretation of the brain signal
+        # interpretation of the brain signal (scaled relative to embedding norm)
         if brain_noise > 0.0:
-            brain_global = brain_global + brain_noise * torch.randn_like(brain_global)
-            brain_tokens = brain_tokens + brain_noise * torch.randn_like(brain_tokens)
+            g_scale = brain_global.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+            brain_global = brain_global + brain_noise * g_scale * torch.randn_like(brain_global)
+            t_scale = brain_tokens.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+            brain_tokens = brain_tokens + brain_noise * t_scale * torch.randn_like(brain_tokens)
 
         # Unconditional embeddings for CFG
         uncond_global = self.uncond_global.expand(BN, -1)

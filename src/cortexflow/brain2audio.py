@@ -24,7 +24,7 @@ from cortexflow._types import (
     Modality,
     ReconstructionResult,
 )
-from cortexflow.brain_encoder import BrainEncoder
+from cortexflow.brain_encoder import BrainEncoder, ROIBrainEncoder
 from cortexflow.flow_matching import RectifiedFlowMatcher
 
 
@@ -175,6 +175,7 @@ class Brain2Audio(nn.Module):
         depth: int = 6,
         num_heads: int = 8,
         sample_rate: int = 16000,
+        brain_encoder: nn.Module | None = None,
     ):
         super().__init__()
         self.n_mels = n_mels
@@ -182,9 +183,13 @@ class Brain2Audio(nn.Module):
         self.sample_rate = sample_rate
 
         cond_dim = hidden_dim
-        self.brain_encoder = BrainEncoder(
-            n_voxels=n_voxels, cond_dim=cond_dim, n_tokens=16,
-        )
+        # Brain encoder — custom or default
+        if brain_encoder is not None:
+            self.brain_encoder = brain_encoder
+        else:
+            self.brain_encoder = BrainEncoder(
+                n_voxels=n_voxels, cond_dim=cond_dim, n_tokens=16,
+            )
         self.dit = AudioDiT(
             n_mels=n_mels, seq_len=audio_len, hidden_dim=hidden_dim,
             depth=depth, num_heads=num_heads, cond_dim=cond_dim,
@@ -195,6 +200,14 @@ class Brain2Audio(nn.Module):
         self.uncond_global = nn.Parameter(torch.zeros(1, cond_dim))
         self.uncond_tokens = nn.Parameter(torch.zeros(1, 16, cond_dim))
 
+    def encode_brain(
+        self, brain_data: BrainData
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode fMRI to conditioning signals."""
+        if isinstance(self.brain_encoder, ROIBrainEncoder) and brain_data.roi_voxels is not None:
+            return self.brain_encoder(brain_data.roi_voxels)
+        return self.brain_encoder(brain_data.voxels)
+
     def training_loss(self, mel: torch.Tensor, brain_data: BrainData) -> torch.Tensor:
         """Flow matching loss on mel spectrograms.
 
@@ -202,7 +215,7 @@ class Brain2Audio(nn.Module):
             mel: Target mel spectrogram ``(B, n_mels, T)``.
             brain_data: Corresponding fMRI.
         """
-        brain_global, brain_tokens = self.brain_encoder(brain_data.voxels)
+        brain_global, brain_tokens = self.encode_brain(brain_data)
         return self.flow_matcher.compute_loss(self.dit, mel, brain_global, brain_tokens)
 
     @torch.no_grad()
@@ -236,7 +249,7 @@ class Brain2Audio(nn.Module):
         """
         B = brain_data.batch_size
         device = brain_data.voxels.device
-        brain_global, brain_tokens = self.brain_encoder(brain_data.voxels)
+        brain_global, brain_tokens = self.encode_brain(brain_data)
 
         # Repeat conditioning for multiple samples per input
         if num_samples > 1:
@@ -246,10 +259,12 @@ class Brain2Audio(nn.Module):
         BN = B * num_samples
 
         # Perturb brain embeddings — each sample explores a different
-        # interpretation of the brain signal
+        # interpretation of the brain signal (scaled relative to embedding norm)
         if brain_noise > 0.0:
-            brain_global = brain_global + brain_noise * torch.randn_like(brain_global)
-            brain_tokens = brain_tokens + brain_noise * torch.randn_like(brain_tokens)
+            g_scale = brain_global.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+            brain_global = brain_global + brain_noise * g_scale * torch.randn_like(brain_global)
+            t_scale = brain_tokens.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+            brain_tokens = brain_tokens + brain_noise * t_scale * torch.randn_like(brain_tokens)
 
         mel_shape = (BN, self.n_mels, self.audio_len)
         mel = self.flow_matcher.sample(

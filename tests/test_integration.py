@@ -5,9 +5,10 @@ import pytest
 
 from cortexflow._types import BrainData, Modality
 from cortexflow.brain2audio import build_brain2audio
-from cortexflow.brain2img import build_brain2img
+from cortexflow.brain2img import Brain2Image, build_brain2img
 from cortexflow.brain2text import build_brain2text
-from cortexflow.brain_encoder import make_synthetic_brain_data
+from cortexflow.brain_encoder import ROIBrainEncoder, make_synthetic_brain_data
+from cortexflow._types import DiTConfig, VAEConfig, FlowConfig
 from conftest import HIDDEN_DIM, N_VOXELS
 
 
@@ -124,3 +125,43 @@ class TestMultiModalPipeline:
 
         # Outputs should differ (brain condition differs)
         assert not torch.equal(r1.output, r2.output)
+
+
+class TestROIBrainEncoding:
+    """Test ROI-aware encoder integration with pipelines."""
+
+    @pytest.fixture
+    def roi_encoder(self):
+        return ROIBrainEncoder(
+            roi_sizes={"V1": 20, "FFA": 15, "A1": 10},
+            cond_dim=16, n_tokens=4, per_roi_dim=8,
+        )
+
+    @pytest.fixture
+    def roi_brain_data(self):
+        return BrainData(
+            voxels=torch.randn(2, 45),
+            roi_voxels={"V1": torch.randn(2, 20), "FFA": torch.randn(2, 15), "A1": torch.randn(2, 10)},
+        )
+
+    def test_roi_brain2img(self, roi_encoder, roi_brain_data):
+        dit_cfg = DiTConfig(hidden_dim=16, depth=1, num_heads=4, cond_dim=16)
+        vae_cfg = VAEConfig(hidden_dims=[8, 16])
+        model = Brain2Image(
+            img_size=8, dit_config=dit_cfg, vae_config=vae_cfg,
+            n_brain_tokens=4, brain_encoder=roi_encoder,
+        )
+        model.eval()
+        result = model.reconstruct(roi_brain_data, num_steps=2)
+        assert result.output.shape == (2, 3, 8, 8)
+
+    def test_roi_ablation_changes_output(self, roi_encoder, roi_brain_data):
+        """Zeroing an ROI should change the brain encoding."""
+        bg1, bt1 = roi_encoder(roi_brain_data.roi_voxels)
+
+        ablated = {k: v.clone() for k, v in roi_brain_data.roi_voxels.items()}
+        ablated["FFA"] = torch.zeros_like(ablated["FFA"])
+        bg2, bt2 = roi_encoder(ablated)
+
+        assert not torch.allclose(bg1, bg2), "Ablating a region should change global embedding"
+        assert not torch.allclose(bt1, bt2), "Ablating a region should change brain tokens"

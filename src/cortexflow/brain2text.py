@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from cortexflow._types import BrainData, Modality, ReconstructionResult
-from cortexflow.brain_encoder import BrainEncoder
+from cortexflow.brain_encoder import BrainEncoder, ROIBrainEncoder
 
 
 class TextDecoderBlock(nn.Module):
@@ -150,12 +150,17 @@ class Brain2Text(nn.Module):
         hidden_dim: int = 256,
         depth: int = 6,
         num_heads: int = 8,
+        brain_encoder: nn.Module | None = None,
     ):
         super().__init__()
         cond_dim = hidden_dim
-        self.brain_encoder = BrainEncoder(
-            n_voxels=n_voxels, cond_dim=cond_dim, n_tokens=16,
-        )
+        # Brain encoder — custom or default
+        if brain_encoder is not None:
+            self.brain_encoder = brain_encoder
+        else:
+            self.brain_encoder = BrainEncoder(
+                n_voxels=n_voxels, cond_dim=cond_dim, n_tokens=16,
+            )
         self.decoder = BrainTextDecoder(
             vocab_size=256,  # byte-level
             max_len=max_len,
@@ -166,6 +171,14 @@ class Brain2Text(nn.Module):
         )
         self.max_len = max_len
         self.bos_token = 0  # null byte as BOS
+
+    def encode_brain(
+        self, brain_data: BrainData
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode fMRI to conditioning signals."""
+        if isinstance(self.brain_encoder, ROIBrainEncoder) and brain_data.roi_voxels is not None:
+            return self.brain_encoder(brain_data.roi_voxels)
+        return self.brain_encoder(brain_data.voxels)
 
     @staticmethod
     def text_to_tokens(text: str) -> torch.Tensor:
@@ -197,7 +210,7 @@ class Brain2Text(nn.Module):
             Scalar cross-entropy loss.
         """
         B, T = text_tokens.shape
-        _, brain_tokens = self.brain_encoder(brain_data.voxels)
+        _, brain_tokens = self.encode_brain(brain_data)
 
         # Prepend BOS so the model learns to predict from BOS context
         # Input: [BOS, t1, t2, ..., t_{T-1}], Target: [t1, t2, ..., t_T]
@@ -254,7 +267,7 @@ class Brain2Text(nn.Module):
         device = brain_data.voxels.device
         gen_len = max_len or self.max_len
 
-        _, brain_tokens = self.brain_encoder(brain_data.voxels)
+        _, brain_tokens = self.encode_brain(brain_data)
 
         # Repeat conditioning for multiple samples per input
         if num_samples > 1:
@@ -263,9 +276,10 @@ class Brain2Text(nn.Module):
         BN = B * num_samples
 
         # Perturb brain embeddings — each sample explores a different
-        # interpretation of the brain signal
+        # interpretation of the brain signal (scaled relative to embedding norm)
         if brain_noise > 0.0:
-            brain_tokens = brain_tokens + brain_noise * torch.randn_like(brain_tokens)
+            t_scale = brain_tokens.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+            brain_tokens = brain_tokens + brain_noise * t_scale * torch.randn_like(brain_tokens)
 
         # Start with BOS token
         generated = torch.full((BN, 1), self.bos_token, dtype=torch.long, device=device)

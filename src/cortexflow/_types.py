@@ -25,12 +25,15 @@ class BrainData:
         voxels: Tensor of shape ``(batch, n_voxels)`` or ``(n_voxels,)``.
         subject_id: Optional subject identifier for subject-specific adapters.
         roi_mask: Optional boolean mask indicating which voxels belong to ROIs.
+        roi_voxels: Optional dict mapping ROI names to per-region tensors
+            ``(batch, n_voxels_roi)``. Used with ``ROIBrainEncoder``.
         tr: Repetition time in seconds (fMRI temporal resolution).
     """
 
     voxels: torch.Tensor
     subject_id: str | None = None
     roi_mask: torch.Tensor | None = None
+    roi_voxels: dict[str, torch.Tensor] | None = None
     tr: float = 2.0
 
     @property

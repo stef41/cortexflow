@@ -2,6 +2,19 @@
 
 All notable changes to CortexFlow will be documented in this file.
 
+## [0.4.0] - 2026-04-12
+
+### Added
+
+- **ROI-aware pipeline support**: All pipelines (`Brain2Image`, `Brain2Audio`, `Brain2Text`) now accept a custom `brain_encoder` parameter. Plug in `ROIBrainEncoder` to process V1, FFA, A1, etc. independently and ablate specific brain regions.
+- **`roi_voxels` field on `BrainData`**: Pass per-region tensors directly; pipelines auto-dispatch to `ROIBrainEncoder` when available.
+- **`encode_brain()` method** on all pipelines: Unified brain encoding interface that handles both standard and ROI encoders.
+- ROI ablation example + diversity measurement demo (`examples/diversity_demo.py`).
+
+### Fixed
+
+- **`brain_noise` now scales relative to embedding norm**: `brain_noise=0.3` means "perturb by 30% of the signal magnitude." Previously used absolute noise that was too weak after training.
+
 ## [0.3.0] - 2026-04-12
 
 ### Added
