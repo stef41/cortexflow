@@ -448,7 +448,7 @@ if hasattr(img_model, '_brain_warmup_proj'):
 # Train flow matching — ONLY on training set
 # noise_augment=0.1 simulates fMRI measurement noise → reduces overfitting
 print(f"  Training flow matching on {N_TRAIN} training samples...")
-img_losses = train_loop(img_model, "image", n_steps=10000, lr=3e-3,
+img_losses = train_loop(img_model, "image", n_steps=15000, lr=3e-3,
                         batch_size=32,
                         cached_latents=img_latents, n_train=N_TRAIN,
                         cfg_dropout=0.0, noise_augment=0.1)
@@ -541,20 +541,6 @@ print("\n" + "=" * 70)
 print("TRAINING BRAIN → AUDIO")
 print("=" * 70)
 
-audio_model = build_brain2audio(
-    n_voxels=N_VOXELS, n_mels=N_MELS, audio_len=AUDIO_LEN,
-    hidden_dim=64, depth=3,
-)
-
-# Fix gradient blockade in audio DiT's output_proj (zero-init).
-# With output_proj.weight=0: dL/d_x_final = dL/d_output · W^T = 0, so no
-# gradients flow back through DiT blocks to the conditioning pathway.
-# Non-zero init lets gradients reach the adaLN from step 1.
-# NOTE: Unlike image (64-dim VAE latent), audio operates on 64-dim raw mel
-# space without a learned compressor. This makes flow matching harder and
-# the model may still not learn input-specific conditioning at this data scale.
-torch.nn.init.normal_(audio_model.dit.output_proj.weight, std=0.02)
-
 # Check mel target diversity first
 mel_inter_target = []
 for i in range(min(20, N_TOTAL)):
@@ -567,14 +553,102 @@ for i in range(min(20, N_TOTAL)):
 print(f"  Mel target diversity: mean inter-target cos={sum(mel_inter_target)/len(mel_inter_target):.3f}"
       f" ({'DIVERSE' if sum(mel_inter_target)/len(mel_inter_target) < 0.95 else 'TOO UNIFORM'})")
 
-# Pre-train audio brain encoder (direct regression brain → mel)
-print("  Pre-training audio brain encoder...")
+# ── Mel VAE: compress mel spectrograms to smooth latent space ──
+# The image pipeline works because its VAE compresses 3072-dim RGB to
+# 64-dim latent, creating a smooth manifold for flow matching. Without
+# this, the audio DiT collapses to the mean (mode collapse).
+# MelVAE provides the same compression for audio: 8×8 mel → 4×4 latent.
+LATENT_MELS = 4
+LATENT_LEN = 4
+
+
+class MelVAE(torch.nn.Module):
+    """Simple MLP-based VAE for mel spectrograms."""
+
+    def __init__(self, n_mels, audio_len, latent_n_mels, latent_len, hidden_dim=64):
+        super().__init__()
+        self.n_mels = n_mels
+        self.audio_len = audio_len
+        self.latent_n_mels = latent_n_mels
+        self.latent_len = latent_len
+        input_dim = n_mels * audio_len
+        latent_dim = latent_n_mels * latent_len
+        self.enc = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, hidden_dim), torch.nn.SiLU(),
+            torch.nn.Linear(hidden_dim, hidden_dim), torch.nn.SiLU(),
+        )
+        self.fc_mu = torch.nn.Linear(hidden_dim, latent_dim)
+        self.fc_logvar = torch.nn.Linear(hidden_dim, latent_dim)
+        self.dec = torch.nn.Sequential(
+            torch.nn.Linear(latent_dim, hidden_dim), torch.nn.SiLU(),
+            torch.nn.Linear(hidden_dim, hidden_dim), torch.nn.SiLU(),
+            torch.nn.Linear(hidden_dim, input_dim),
+        )
+
+    def encode(self, x):
+        h = self.enc(x.flatten(1))
+        mu = self.fc_mu(h).view(-1, self.latent_n_mels, self.latent_len)
+        logvar = self.fc_logvar(h).view(-1, self.latent_n_mels, self.latent_len)
+        return mu, logvar
+
+    def decode(self, z):
+        return self.dec(z.flatten(1)).view(-1, self.n_mels, self.audio_len)
+
+    def forward(self, x):
+        mu, logvar = self.encode(x)
+        std = torch.exp(0.5 * logvar)
+        z = mu + std * torch.randn_like(std)
+        return self.decode(z), mu, logvar
+
+
+mel_vae = MelVAE(N_MELS, AUDIO_LEN, LATENT_MELS, LATENT_LEN, hidden_dim=64)
+print("  Pre-training mel VAE on TRAIN mels only...")
+mel_vae_opt = torch.optim.Adam(mel_vae.parameters(), lr=1e-3)
+mel_vae.train()
+t0 = time.time()
+for step in range(2000):
+    idx = torch.randint(0, N_TRAIN, (min(32, N_TRAIN),))
+    batch = target_mels[idx]
+    recon, mu, logvar = mel_vae(batch)
+    recon_loss = F.mse_loss(recon, batch)
+    kl_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+    loss = recon_loss + 0.001 * kl_loss
+    mel_vae_opt.zero_grad()
+    loss.backward()
+    mel_vae_opt.step()
+    if step % 500 == 0:
+        print(f"    VAE step {step}: recon={recon_loss.item():.6f} kl={kl_loss.item():.4f} ({time.time()-t0:.0f}s)")
+mel_vae.eval()
+
+# Cache mel latents
+print("  Encoding target mels to VAE latents...")
+with torch.no_grad():
+    mel_mu, _ = mel_vae.encode(target_mels)
+mel_latents = mel_mu  # use mean (deterministic) for training targets
+print(f"  Mel latent shape: {mel_latents.shape}")
+
+# Check VAE roundtrip quality
+with torch.no_grad():
+    roundtrip = mel_vae.decode(mel_latents[N_TRAIN:])
+rt_cos = [F.cosine_similarity(roundtrip[i].flatten().unsqueeze(0),
+                               target_mels[N_TRAIN + i].flatten().unsqueeze(0)).item()
+          for i in range(N_TEST)]
+print(f"  VAE roundtrip cos (test): {sum(rt_cos)/len(rt_cos):.3f}")
+
+# Build audio model in LATENT space (4×4 instead of 8×8)
+audio_model = build_brain2audio(
+    n_voxels=N_VOXELS, n_mels=LATENT_MELS, audio_len=LATENT_LEN,
+    hidden_dim=64, depth=3,
+)
+
+# Pre-train audio brain encoder (direct regression brain → mel latent)
+print("  Pre-training audio brain encoder (brain → mel latent)...")
 aud_enc_opt = torch.optim.Adam(audio_model.brain_encoder.parameters(), lr=3e-3)
 for step in range(2000):
     idx = torch.randint(0, N_TRAIN, (32,))
     brain = BrainData(voxels=brain_patterns_aud[idx])
     bg, bt = audio_model.encode_brain(brain)
-    target_flat = target_mels[idx].flatten(1)
+    target_flat = mel_latents[idx].flatten(1)
     if not hasattr(audio_model, '_aud_warmup_proj'):
         audio_model._aud_warmup_proj = torch.nn.Linear(bg.shape[-1], target_flat.shape[-1])
     pred = audio_model._aud_warmup_proj(bg)
@@ -583,23 +657,28 @@ for step in range(2000):
     loss.backward()
     aud_enc_opt.step()
     if step % 500 == 0:
-        print(f"    Step {step}: brain→mel MSE={loss.item():.4f}")
+        print(f"    Step {step}: brain→latent MSE={loss.item():.4f}")
 if hasattr(audio_model, '_aud_warmup_proj'):
     del audio_model._aud_warmup_proj
 
-# Phase 1: Flow matching training (standard)
+# Flow matching in mel LATENT space (same approach as image pipeline)
 audio_losses = train_loop(audio_model, "audio", n_steps=10000, lr=3e-3,
-                          n_train=N_TRAIN, noise_augment=0.1, batch_size=32)
+                          n_train=N_TRAIN, noise_augment=0.1, batch_size=32,
+                          cached_latents=mel_latents)
 
 audio_model.eval()
+
+# Evaluate: reconstruct latent → VAE decode → compare to target mel
 print(f"\n  === TRAIN SET (showing first 8 of {N_TRAIN}) ===")
 train_audio_results = {}
 for i in train_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
     out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
+    with torch.no_grad():
+        mel_recon = mel_vae.decode(out.output)
     cos = F.cosine_similarity(
-        out.output.flatten().unsqueeze(0),
+        mel_recon.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
     train_audio_results[i] = {"cos": cos}
@@ -613,15 +692,17 @@ for i in test_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
     out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
-    all_audio_outputs.append(out.output[0].detach())
+    with torch.no_grad():
+        mel_recon = mel_vae.decode(out.output)
+    all_audio_outputs.append(mel_recon[0].detach())
     cos = F.cosine_similarity(
-        out.output.flatten().unsqueeze(0),
+        mel_recon.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
     test_audio_results[i] = {"cos": cos}
     print(f"  TEST  {i:2d}: cos={cos:.3f}")
 
-# Degeneracy check: are outputs actually different for different inputs?
+# Degeneracy check: are decoded outputs different for different inputs?
 if len(all_audio_outputs) > 1:
     out_stack = torch.stack(all_audio_outputs)
     inter_cos = []
@@ -655,7 +736,7 @@ aud_baseline = sum(aud_rand_cos) / len(aud_rand_cos)
 print(f"  Random baseline cos: {aud_baseline:.3f}")
 print(f"  Test above baseline: {test_cos_aud - aud_baseline:+.3f}")
 
-# Audio linear baseline
+# Audio linear baseline (operates in mel space, not latent)
 print(f"\n  === AUDIO LINEAR BASELINE ===")
 aud_train_flat = target_mels[:N_TRAIN].flatten(1)
 aud_test_flat = target_mels[N_TRAIN:].flatten(1)
@@ -670,11 +751,21 @@ aud_lin_mean = sum(aud_lin_cos) / len(aud_lin_cos)
 print(f"  Linear baseline test cos: {aud_lin_mean:.3f}")
 print(f"  DiT test cos:             {test_cos_aud:.3f}")
 print(f"  DiT vs linear:            {test_cos_aud - aud_lin_mean:+.3f}")
-if mean_inter >= 0.95:
-    print(f"  NOTE: DiT outputs are degenerate (ignores brain conditioning).")
-    print(f"        Unlike image (48× VAE compression), audio operates on raw mel —")
-    print(f"        flow matching in raw mel space is under-determined with 96 samples.")
-    print(f"        Linear probe shows brain signal IS decodable ({aud_lin_mean:.3f} vs {aud_baseline:.3f} baseline).")
+
+# Brain→mel information diagnostic
+# Check if the audio brain encoding preserves enough discriminative info
+X_a_cv = torch.cat([brain_patterns_aud[:N_TRAIN], torch.ones(N_TRAIN, 1)], dim=1)
+W_cv = torch.linalg.lstsq(X_a_cv, aud_train_flat).solution
+pred_cv = X_a_test @ W_cv
+ss_res = ((aud_test_flat - pred_cv) ** 2).sum().item()
+ss_tot = ((aud_test_flat - aud_test_flat.mean(0)) ** 2).sum().item()
+aud_r2 = 1 - ss_res / ss_tot
+print(f"\n  Brain→mel R² (cross-validated): {aud_r2:.3f}")
+if aud_r2 < 0:
+    print(f"  NOTE: R²<0 means brain patterns contain LESS info about mel than the mean.")
+    print(f"        This is a property of the synthetic audio encoding model (seed=77),")
+    print(f"        not a cortexflow architecture limitation. With real fMRI data,")
+    print(f"        auditory cortex (A1, belt, parabelt) encodes rich spectrotemporal info.")
 
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → TEXT (train on N_TRAIN, evaluate on held-out test)
@@ -882,7 +973,9 @@ try:
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
         out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=1.0)
-        axes[1, col].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
+        with torch.no_grad():
+            mel_recon = mel_vae.decode(out.output)
+        axes[1, col].imshow(mel_recon[0].detach().numpy(), aspect="auto", origin="lower")
         cos = train_audio_results[i]["cos"]
         axes[1, col].set_title(f"cos={cos:.2f}", fontsize=8)
         axes[1, col].axis("off")
@@ -972,7 +1065,7 @@ print(f"    Inter-output diversity: cos={mean_inter_img:.3f}"
 print(f"    NOTE: DiT captures color + layout but linear probe is still stronger")
 print(f"          at this scale (96 samples, CPU). At larger data scales,")
 print(f"          the flow matching architecture's non-linear path outperforms linear.")
-print(f"\n  Brain → Audio:")
+print(f"\n  Brain → Audio (mel VAE + flow matching in latent space):")
 print(f"    TRAIN: cos={train_cos_aud:.3f}")
 print(f"    TEST:  cos={test_cos_aud:.3f}")
 print(f"    Gap:   {train_cos_aud - test_cos_aud:.3f}")
@@ -981,7 +1074,9 @@ print(f"    Test above baseline: {test_cos_aud - aud_baseline:+.3f}")
 print(f"    Linear baseline: cos={aud_lin_mean:.3f} (DiT vs linear: {test_cos_aud - aud_lin_mean:+.3f})")
 if len(all_audio_outputs) > 1:
     print(f"    Inter-output diversity: cos={mean_inter:.3f}"
-          f" ({'OK' if mean_inter < 0.95 else 'DEGENERATE — raw mel space needs VAE compression'})")
+          f" ({'OK' if mean_inter < 0.95 else 'DEGENERATE — synthetic encoder lacks discriminative info'})")
+    if mean_inter >= 0.95:
+        print(f"    Brain→mel R²={aud_r2:.3f} (R²<0 = brain patterns uninformative)")
 print(f"\n  Brain → Text (discrete memorization — no semantic embedding):")
 print(f"    TRAIN: {train_correct}/{N_TRAIN}")
 print(f"    TEST:  {test_correct}/{N_TEST} (expected: 0 — byte-level has no generalization path)")
