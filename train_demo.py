@@ -27,11 +27,12 @@ from cortexflow import (
     build_brain2text,
     Brain2Text,
 )
+from cortexflow._types import DiTConfig, VAEConfig, FlowConfig
+from cortexflow.brain2img import Brain2Image
 
 # neuroprobe provides the forward encoding model (stimulus → brain)
 from neuroprobe.media import (
     build_brain_model,
-    synthesize_video,
     synthesize_audio,
 )
 
@@ -45,7 +46,7 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 N_SAMPLES = 16      # number of (brain, stimulus) pairs per modality
 N_VOXELS = 128      # brain activity dimensionality
-IMG_SIZE = 8        # cortexflow output image size
+IMG_SIZE = 32       # cortexflow output image size (32x32 → recognizable shapes)
 N_MELS = 16         # mel spectrogram bands
 AUDIO_LEN = 16      # mel spectrogram time steps
 
@@ -73,23 +74,103 @@ text_forward = build_brain_model(
 
 print(f"  Forward models: stimulus → {N_VOXELS}-dim brain activity")
 
-# --- Image data: synthesize videos, take single frame as target ---
-print(f"\n  Generating {N_SAMPLES} image stimuli via synthesize_video...")
+# --- Image data: clean synthetic images with recognizable content ---
+print(f"\n  Generating {N_SAMPLES} clean synthetic images ({IMG_SIZE}x{IMG_SIZE})...")
+
+
+def make_synthetic_image(idx, size):
+    """Generate a clean, recognizable image with shapes on solid background."""
+    img = torch.zeros(3, size, size)
+    yy, xx = torch.meshgrid(torch.arange(size), torch.arange(size), indexing="ij")
+    yy_f = yy.float()
+    xx_f = xx.float()
+    cy, cx = size // 2, size // 2
+
+    if idx == 0:    # red circle on white
+        img[:] = 1.0
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 4) ** 2
+        img[0][mask] = 1.0; img[1][mask] = 0.0; img[2][mask] = 0.0
+    elif idx == 1:  # blue square on black
+        s = size // 4
+        img[:, cy - s:cy + s, cx - s:cx + s] = 0.0
+        img[2, cy - s:cy + s, cx - s:cx + s] = 1.0
+    elif idx == 2:  # green circle on gray
+        img[:] = 0.5
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
+        img[0][mask] = 0.0; img[1][mask] = 0.9; img[2][mask] = 0.0
+    elif idx == 3:  # yellow horizontal bar on dark blue
+        img[2] = 0.3
+        h = size // 6
+        img[0, cy - h:cy + h, :] = 1.0; img[1, cy - h:cy + h, :] = 1.0
+        img[2, cy - h:cy + h, :] = 0.0
+    elif idx == 4:  # white circle on red
+        img[0] = 0.8
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 4) ** 2
+        img[:, :, :][0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
+    elif idx == 5:  # magenta square on dark green
+        img[1] = 0.3
+        s = size // 3
+        img[0, cy - s:cy + s, cx - s:cx + s] = 0.9
+        img[2, cy - s:cy + s, cx - s:cx + s] = 0.9
+    elif idx == 6:  # cyan horizontal stripe on white
+        img[:] = 1.0
+        h = size // 5
+        img[0, cy - h:cy + h, :] = 0.0; img[1, cy - h:cy + h, :] = 1.0
+        img[2, cy - h:cy + h, :] = 1.0
+    elif idx == 7:  # orange vertical bar on blue
+        img[2] = 0.7
+        w = size // 5
+        img[0, :, cx - w:cx + w] = 1.0; img[1, :, cx - w:cx + w] = 0.5
+        img[2, :, cx - w:cx + w] = 0.0
+    elif idx == 8:  # left red, right blue
+        img[0, :, :cx] = 0.9
+        img[2, :, cx:] = 0.9
+    elif idx == 9:  # top green, bottom yellow
+        img[1, :cy, :] = 0.8
+        img[0, cy:, :] = 1.0; img[1, cy:, :] = 1.0
+    elif idx == 10: # bright center (white circle on black)
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
+        img[:] = 0.0; img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
+    elif idx == 11: # dark center (black circle on white)
+        img[:] = 1.0
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
+        img[0][mask] = 0.0; img[1][mask] = 0.0; img[2][mask] = 0.0
+    elif idx == 12: # red gradient left→right
+        img[0] = xx_f / size
+    elif idx == 13: # blue gradient top→bottom
+        img[2] = yy_f / size
+    elif idx == 14: # checkerboard (4x4 blocks)
+        block = size // 4
+        for bi in range(4):
+            for bj in range(4):
+                if (bi + bj) % 2 == 0:
+                    img[:, bi*block:(bi+1)*block, bj*block:(bj+1)*block] = 1.0
+    elif idx == 15: # diagonal split: purple top-left, green bottom-right
+        for y in range(size):
+            for x in range(size):
+                if x + y < size:
+                    img[0, y, x] = 0.6; img[2, y, x] = 0.8
+                else:
+                    img[1, y, x] = 0.7
+    return img.clamp(0, 1)
+
+
 image_brains, image_targets = [], []
 for i in range(N_SAMPLES):
-    video = synthesize_video(n_frames=1, height=IMG_SIZE, width=IMG_SIZE,
-                             seed=i * 13 + 7)  # distinct scenes
+    clean_img = make_synthetic_image(i, IMG_SIZE)  # (3, H, W)
+    # Feed to neuroprobe as single-frame video for brain encoding
+    video = clean_img.unsqueeze(0)  # (1, 3, H, W)
     with torch.no_grad():
         bold = vision_forward.predict(video)    # (1, V)
         brain_vec = bold.mean(dim=0)            # (V,)
     image_brains.append(brain_vec)
-    image_targets.append(video[0])              # single frame (3, H, W)
+    image_targets.append(clean_img)
 
 brain_patterns_img = torch.stack(image_brains)  # (N, V)
 target_images = torch.stack(image_targets)      # (N, 3, H, W)
 print(f"  Brain: {brain_patterns_img.shape}, range "
       f"[{brain_patterns_img.min():.2f}, {brain_patterns_img.max():.2f}]")
-print(f"  Images: {target_images.shape}")
+print(f"  Images: {target_images.shape} — clean geometric shapes")
 
 # --- Audio data: synthesize waveforms → mel-like target ---
 print(f"\n  Generating {N_SAMPLES} audio stimuli via synthesize_audio...")
@@ -202,9 +283,11 @@ print("\n" + "=" * 70)
 print("TRAINING BRAIN → IMAGE")
 print("=" * 70)
 
-img_model = build_brain2img(
+img_model = Brain2Image(
     n_voxels=N_VOXELS, img_size=IMG_SIZE,
-    hidden_dim=32, depth=2, num_heads=4,
+    dit_config=DiTConfig(hidden_dim=48, depth=3, num_heads=4, cond_dim=48),
+    vae_config=VAEConfig(hidden_dims=[32, 64, 128]),  # 3 downsamples → 4x4 latent
+    flow_config=FlowConfig(),
 )
 
 # Pre-train VAE on target images
@@ -244,7 +327,7 @@ img_results = {}
 for i in range(N_SAMPLES):
     brain = BrainData(voxels=brain_patterns_img[i:i + 1])
     torch.manual_seed(0)
-    out = img_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+    out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
     l2 = (out.output - target_images[i:i + 1]).pow(2).mean().sqrt().item()
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
@@ -389,17 +472,17 @@ try:
 
     # Save image reconstructions grid
     n_show = min(8, N_SAMPLES)
-    fig, axes = plt.subplots(2, n_show, figsize=(2.5 * n_show, 5))
+    fig, axes = plt.subplots(2, n_show, figsize=(3 * n_show, 6))
     for i in range(n_show):
         t = target_images[i].permute(1, 2, 0).clamp(0, 1).numpy()
-        axes[0, i].imshow(t)
+        axes[0, i].imshow(t, interpolation="nearest")
         axes[0, i].set_title(f"Target {i}", fontsize=8)
         axes[0, i].axis("off")
         brain = BrainData(voxels=brain_patterns_img[i:i + 1])
         torch.manual_seed(0)
-        out = img_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
         r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
-        axes[1, i].imshow(r)
+        axes[1, i].imshow(r, interpolation="nearest")
         cos = img_results[i]["cos"]
         axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)
         axes[1, i].axis("off")
@@ -417,7 +500,7 @@ try:
         axes[0, i].axis("off")
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+        out = audio_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
         axes[1, i].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
         cos = audio_results[i]["cos"]
         axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)

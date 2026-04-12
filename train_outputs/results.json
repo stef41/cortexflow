@@ -3,22 +3,22 @@
   "n_samples": 16,
   "n_voxels": 128,
   "image": {
-    "final_loss": 0.233628,
-    "min_loss": 0.096579,
-    "initial_loss": 4.003617,
-    "mean_cosine": 0.942174,
+    "final_loss": 0.225351,
+    "min_loss": 0.092447,
+    "initial_loss": 8.104956,
+    "mean_cosine": 0.937928,
     "good_reconstructions": 16
   },
   "audio": {
-    "final_loss": 0.038569,
-    "min_loss": 0.0156,
-    "initial_loss": 1.168745,
-    "mean_cosine": 0.955563,
+    "final_loss": 0.0301,
+    "min_loss": 0.011256,
+    "initial_loss": 1.180726,
+    "mean_cosine": 0.956587,
     "good_reconstructions": 16
   },
   "text": {
-    "final_loss": 0.000363,
-    "min_loss": 0.000223,
+    "final_loss": 0.000328,
+    "min_loss": 0.000251,
     "initial_loss": 21.851589,
     "exact_match": 16,
     "results": {
@@ -27,7 +27,7 @@
       "moon": "moona",
       "star": "star\ufffd",
       "wind": "winda",
-      "rain": "rain\ufffd",
+      "rain": "raina",
       "tree": "tree\ufffd",
       "bird": "birdi",
       "gold": "gold*",
@@ -35,7 +35,7 @@
       "dust": "dusta",
       "salt": "salta",
       "bone": "bone\u0019",
-      "silk": "silks",
+      "silk": "silk_",
       "jade": "jade\u0019",
       "rust": "rustt"
     }
