@@ -1,78 +1,78 @@
 {
   "data_source": "neuroprobe forward encoding (stimulus -> simulated BOLD)",
   "split": {
-    "total": 24,
-    "train": 18,
-    "test": 6
+    "total": 120,
+    "train": 96,
+    "test": 24
   },
-  "n_voxels": 128,
+  "n_voxels": 512,
   "image": {
-    "final_loss": 0.193099,
+    "final_loss": 1.190417,
     "train": {
-      "mean_cos": 0.965716,
-      "mean_ssim": 0.91016
+      "mean_cos": 0.800927,
+      "mean_ssim": 0.125053
     },
     "test": {
-      "mean_cos": 0.617129,
-      "mean_ssim": 0.105593
+      "mean_cos": 0.799199,
+      "mean_ssim": 0.06664
     },
-    "generalization_gap_cos": 0.348587
+    "generalization_gap_cos": 0.001728
   },
   "audio": {
-    "final_loss": 0.030643,
+    "final_loss": 0.04969,
     "train": {
-      "mean_cos": 0.962824
+      "mean_cos": 0.95769
     },
     "test": {
-      "mean_cos": 0.961552
+      "mean_cos": 0.95689
     },
-    "generalization_gap_cos": 0.001272
+    "generalization_gap_cos": 0.0008
   },
   "text": {
-    "final_loss": 1.1e-05,
+    "final_loss": 0.021498,
     "train": {
-      "exact_match": 18,
-      "total": 18
+      "exact_match": 87,
+      "total": 96
     },
     "test": {
       "exact_match": 0,
-      "total": 6
+      "total": 24
     },
     "results": {
-      "fire": "fire",
-      "lake": "lake",
-      "moon": "moon",
-      "star": "star",
-      "wind": "wind",
-      "rain": "rain",
-      "tree": "tree",
-      "bird": "bird",
-      "gold": "gold",
-      "iron": "iron",
-      "dust": "dust",
-      "salt": "salt",
-      "bone": "bone",
-      "silk": "silk",
-      "jade": "jade",
-      "rust": "rust",
-      "dawn": "dawn",
-      "peak": "peak",
-      "wave": "jade",
-      "rose": "lire",
-      "coal": "lake",
-      "palm": "salt",
-      "cork": "iron",
-      "mint": "moon"
+      "jig": "kite",
+      "lark": "arch",
+      "malt": "salm",
+      "nib": "zinc",
+      "orb": "rose",
+      "peg": "pien",
+      "rye": "tusp",
+      "sap": "salt",
+      "tar": "rark",
+      "urn": "urne",
+      "vow": "wnck",
+      "web": "yewe",
+      "yam": "palm",
+      "zest": "twig",
+      "aloe": "clam",
+      "chop": "opoh",
+      "dusk": "dock",
+      "elk": "kelp",
+      "fox": "fold",
+      "gum": "lime",
+      "hut": "hull",
+      "jab": "jadz",
+      "keg": "kegg",
+      "lid": "jade"
     }
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.07646,
+    "mean_l2": 0.258304,
     "per_input": [
-      0.105208,
-      0.080167,
-      0.063644,
-      0.056821
+      0.320124,
+      0.352976,
+      0.095503,
+      0.264613
     ]
   }
 }

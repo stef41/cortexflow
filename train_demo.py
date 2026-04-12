@@ -47,10 +47,10 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-N_TOTAL = 24        # total (brain, stimulus) pairs
-N_TRAIN = 18        # training set
-N_TEST = 6          # held-out test set (NEVER seen during training)
-N_VOXELS = 128      # brain activity dimensionality
+N_TOTAL = 120       # total (brain, stimulus) pairs
+N_TRAIN = 96        # training set
+N_TEST = 24         # held-out test set (NEVER seen during training)
+N_VOXELS = 512      # brain activity dimensionality
 IMG_SIZE = 32       # cortexflow output image size
 N_MELS = 16         # mel spectrogram bands
 AUDIO_LEN = 16      # mel spectrogram time steps
@@ -94,125 +94,69 @@ print(f"  Forward models: stimulus → {N_VOXELS}-dim brain activity")
 print(f"  Train/test split: {N_TRAIN} train / {N_TEST} test (held-out)")
 
 
-# ── Image generation: structured scenes with varying complexity ──
-print(f"\n  Generating {N_TOTAL} synthetic images ({IMG_SIZE}x{IMG_SIZE})...")
+# ── Image generation: parameterized random shapes ──
+print(f"\n  Generating {N_TOTAL} parameterized images ({IMG_SIZE}x{IMG_SIZE})...")
 
 
-def make_synthetic_image(idx, size):
-    """Generate a structured image: shapes with texture and color variation."""
-    img = torch.zeros(3, size, size)
+def make_random_image(seed, size):
+    """Generate a parameterized image: random shape, position, color, background.
+
+    Same seed always produces the same image. Different seeds produce
+    structurally different images that share the same generative process,
+    enabling the model to learn shape/color/position from brain patterns
+    rather than memorizing individual images.
+    """
+    gen = torch.Generator().manual_seed(seed)
+    # Random background (darker range for contrast)
+    bg = torch.rand(3, generator=gen) * 0.4
+    img = bg.view(3, 1, 1).expand(3, size, size).clone()
+
+    # Shape type: 0=circle, 1=square, 2=hbar, 3=vbar, 4=two-tone
+    shape_type = torch.randint(0, 5, (1,), generator=gen).item()
+
+    # Foreground color (brighter range for visibility)
+    fg = torch.rand(3, generator=gen) * 0.5 + 0.5
+
+    # Random position and size
+    cy = torch.randint(size // 4, 3 * size // 4 + 1, (1,), generator=gen).item()
+    cx = torch.randint(size // 4, 3 * size // 4 + 1, (1,), generator=gen).item()
+    r = torch.randint(size // 6, size // 3 + 1, (1,), generator=gen).item()
+
     yy, xx = torch.meshgrid(torch.arange(size), torch.arange(size), indexing="ij")
-    yy_f, xx_f = yy.float(), xx.float()
-    cy, cx = size // 2, size // 2
-    r_small = size // 5
-    r_large = size // 3
+    yf, xf = yy.float(), xx.float()
 
-    if idx == 0:    # red circle, white bg
-        img[:] = 1.0
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
-        img[0][mask] = 1.0; img[1][mask] = 0.0; img[2][mask] = 0.0
-    elif idx == 1:  # blue square, black bg
-        s = size // 4
-        img[2, cy - s:cy + s, cx - s:cx + s] = 1.0
-    elif idx == 2:  # green circle, gray bg
-        img[:] = 0.5
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
-        img[0][mask] = 0.0; img[1][mask] = 0.9; img[2][mask] = 0.0
-    elif idx == 3:  # yellow bar, dark blue bg
-        img[2] = 0.3
-        h = size // 6
-        img[0, cy - h:cy + h, :] = 1.0; img[1, cy - h:cy + h, :] = 1.0
-    elif idx == 4:  # white circle, red bg
-        img[0] = 0.8
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_small ** 2
-        img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
-    elif idx == 5:  # magenta square, dark green bg
-        img[1] = 0.3
-        s = size // 3
-        img[0, cy - s:cy + s, cx - s:cx + s] = 0.9
-        img[2, cy - s:cy + s, cx - s:cx + s] = 0.9
-    elif idx == 6:  # cyan stripe on white
-        img[:] = 1.0
-        h = size // 5
-        img[0, cy - h:cy + h, :] = 0.0
-    elif idx == 7:  # orange vertical bar on blue
-        img[2] = 0.7
-        w = size // 5
-        img[0, :, cx - w:cx + w] = 1.0; img[1, :, cx - w:cx + w] = 0.5
-        img[2, :, cx - w:cx + w] = 0.0
-    elif idx == 8:  # left red, right blue split
-        img[0, :, :cx] = 0.9; img[2, :, cx:] = 0.9
-    elif idx == 9:  # top green, bottom yellow
-        img[1, :cy, :] = 0.8
-        img[0, cy:, :] = 1.0; img[1, cy:, :] = 1.0
-    elif idx == 10: # white circle on black
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
-        img[:][0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
-    elif idx == 11: # black circle on white
-        img[:] = 1.0
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
-        img[0][mask] = 0.0; img[1][mask] = 0.0; img[2][mask] = 0.0
-    elif idx == 12: # red gradient left→right
-        img[0] = xx_f / size
-    elif idx == 13: # blue gradient top→bottom
-        img[2] = yy_f / size
-    elif idx == 14: # checkerboard (4x4)
-        block = size // 4
-        for bi in range(4):
-            for bj in range(4):
-                if (bi + bj) % 2 == 0:
-                    img[:, bi*block:(bi+1)*block, bj*block:(bj+1)*block] = 1.0
-    elif idx == 15: # purple/green diagonal split
-        for y in range(size):
-            for x in range(size):
-                if x + y < size:
-                    img[0, y, x] = 0.6; img[2, y, x] = 0.8
-                else:
-                    img[1, y, x] = 0.7
-    elif idx == 16: # concentric: red ring + blue center
-        d = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2).sqrt()
-        ring = (d > r_small) & (d < r_large)
-        center = d <= r_small
-        img[0][ring] = 0.9
-        img[2][center] = 0.9
-    elif idx == 17: # green cross on black
-        w = size // 8
-        img[1, cy - w:cy + w, :] = 0.8
-        img[1, :, cx - w:cx + w] = 0.8
-    elif idx == 18: # orange circle on purple bg
-        img[0] = 0.5; img[2] = 0.5
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
-        img[0][mask] = 1.0; img[1][mask] = 0.6; img[2][mask] = 0.0
-    elif idx == 19: # white vertical bar on dark red
-        img[0] = 0.4
-        w = size // 5
-        img[:, :, cx - w:cx + w] = 1.0
-    elif idx == 20: # yellow circle on blue
-        img[2] = 0.7
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_small ** 2
-        img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 0.0
-    elif idx == 21: # four quadrant colors (R/G/B/Y)
-        img[0, :cy, :cx] = 0.9
-        img[1, :cy, cx:] = 0.9
-        img[2, cy:, :cx] = 0.9
-        img[0, cy:, cx:] = 0.9; img[1, cy:, cx:] = 0.9
-    elif idx == 22: # horizontal green/white/green flag
-        h3 = size // 3
-        img[1, :h3, :] = 0.8
-        img[:, h3:2*h3, :] = 1.0
-        img[1, 2*h3:, :] = 0.8
-    elif idx == 23: # red X (diagonal cross) on white
-        img[:] = 1.0
-        for y in range(size):
-            for x in range(size):
-                if abs(x - y) < size // 8 or abs(x - (size - 1 - y)) < size // 8:
-                    img[0, y, x] = 0.9; img[1, y, x] = 0.0; img[2, y, x] = 0.0
+    if shape_type == 0:  # circle
+        mask = ((yf - cy) ** 2 + (xf - cx) ** 2) < r ** 2
+        for c in range(3):
+            img[c][mask] = fg[c]
+    elif shape_type == 1:  # square
+        mask = (yy >= max(0, cy - r)) & (yy < min(size, cy + r)) & \
+               (xx >= max(0, cx - r)) & (xx < min(size, cx + r))
+        for c in range(3):
+            img[c][mask] = fg[c]
+    elif shape_type == 2:  # horizontal bar
+        h = max(2, r // 2)
+        mask = (yy >= max(0, cy - h)) & (yy < min(size, cy + h))
+        for c in range(3):
+            img[c][mask] = fg[c]
+    elif shape_type == 3:  # vertical bar
+        w = max(2, r // 2)
+        mask = (xx >= max(0, cx - w)) & (xx < min(size, cx + w))
+        for c in range(3):
+            img[c][mask] = fg[c]
+    elif shape_type == 4:  # two-tone vertical split
+        fg2 = torch.rand(3, generator=gen) * 0.5 + 0.5
+        split = torch.randint(size // 3, 2 * size // 3 + 1, (1,), generator=gen).item()
+        for c in range(3):
+            img[c, :, :split] = fg[c]
+            img[c, :, split:] = fg2[c]
+
     return img.clamp(0, 1)
 
 
 image_brains, image_targets = [], []
 for i in range(N_TOTAL):
-    clean_img = make_synthetic_image(i, IMG_SIZE)
+    clean_img = make_random_image(i * 7 + 13, IMG_SIZE)
     video = clean_img.unsqueeze(0)
     with torch.no_grad():
         bold = vision_forward.predict(video)
@@ -227,8 +171,8 @@ target_images = torch.stack(image_targets)
 train_idx = list(range(N_TRAIN))
 test_idx = list(range(N_TRAIN, N_TOTAL))
 print(f"  Images: {target_images.shape}")
-print(f"  Train indices: {train_idx}")
-print(f"  Test  indices: {test_idx} (HELD OUT)")
+print(f"  Train: indices 0-{N_TRAIN-1} ({N_TRAIN} samples)")
+print(f"  Test:  indices {N_TRAIN}-{N_TOTAL-1} ({N_TEST} samples, HELD OUT)")
 
 # ── Audio data ──
 print(f"\n  Generating {N_TOTAL} audio stimuli via synthesize_audio...")
@@ -254,11 +198,29 @@ target_mels = torch.stack(audio_targets)
 print(f"  Mels: {target_mels.shape}")
 
 # ── Text data ──
+# Text is a discrete memorization task — generalization requires semantic
+# embeddings, which this byte-level decoder doesn't have. We include it
+# to demonstrate the pipeline works, not to claim generalization.
 print(f"\n  Generating {N_TOTAL} text stimuli...")
-words = ["fire", "lake", "moon", "star", "wind", "rain", "tree", "bird",
-         "gold", "iron", "dust", "salt", "bone", "silk", "jade", "rust",
-         "dawn", "peak", "wave", "rose", "coal", "palm", "cork", "mint"]
-words = words[:N_TOTAL]
+# 120 unique 4-char words
+_base_words = [
+    "fire", "lake", "moon", "star", "wind", "rain", "tree", "bird",
+    "gold", "iron", "dust", "salt", "bone", "silk", "jade", "rust",
+    "dawn", "peak", "wave", "rose", "coal", "palm", "cork", "mint",
+    "bark", "cliff", "dew", "fog", "glow", "haze", "isle", "knot",
+    "loom", "moss", "nest", "opal", "pine", "reed", "snow", "tide",
+    "vale", "wren", "zinc", "arch", "bell", "cape", "dove", "echo",
+    "fern", "glen", "harp", "inch", "jazz", "kelp", "lime", "mist",
+    "noir", "onyx", "pond", "quiz", "reef", "sage", "tusk", "urn",
+    "vine", "wax", "yew", "zeal", "acre", "bass", "cove", "dune",
+    "elm", "fawn", "grit", "hemp", "iris", "jolt", "kite", "lynx",
+    "mace", "nook", "oath", "pyre", "rift", "silt", "twig", "wick",
+    "axle", "brew", "clam", "dock", "ewe", "flux", "gap", "hull",
+    "jig", "lark", "malt", "nib", "orb", "peg", "rye", "sap",
+    "tar", "urn", "vow", "web", "yam", "zest", "aloe", "chop",
+    "dusk", "elk", "fox", "gum", "hut", "jab", "keg", "lid",
+]
+words = _base_words[:N_TOTAL]
 text_brains, text_tokens_list = [], []
 for i, word in enumerate(words):
     tokens = Brain2Text.text_to_tokens(word)
@@ -273,8 +235,9 @@ for i, word in enumerate(words):
 
 brain_patterns_txt = torch.stack(text_brains)
 target_tokens = torch.stack(text_tokens_list)
-print(f"  Words (train): {words[:N_TRAIN]}")
-print(f"  Words (test):  {words[N_TRAIN:]}")
+print(f"  Words: {len(words)} total (train: first {N_TRAIN}, test: last {N_TEST})")
+print(f"  Sample train: {words[:8]}")
+print(f"  Sample test:  {words[N_TRAIN:N_TRAIN+8]}")
 
 
 def make_batch(indices, modality="image"):
@@ -323,7 +286,7 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
         scheduler.step()
         losses.append(loss.item())
 
-        if step % 200 == 0 or step == n_steps - 1:
+        if step % 500 == 0 or step == n_steps - 1:
             elapsed = time.time() - t0
             avg = sum(losses[-50:]) / min(50, len(losses))
             print(f"  Step {step:5d}/{n_steps}: loss={loss.item():.4f} avg50={avg:.4f} "
@@ -332,7 +295,7 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     return losses
 
 
-def evaluate_images(model, indices, brain_patterns, targets, label=""):
+def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True):
     """Evaluate image reconstructions with cos, SSIM, L2."""
     model.eval()
     results = {}
@@ -347,8 +310,9 @@ def evaluate_images(model, indices, brain_patterns, targets, label=""):
         ssim = compute_ssim(recon, target)
         l2 = (recon - target).pow(2).mean().sqrt().item()
         results[i] = {"cos": cos, "ssim": ssim, "l2": l2}
-        quality = "✓" if ssim > 0.5 else ("~" if ssim > 0.2 else "✗")
-        print(f"  {label} {i:2d}: SSIM={ssim:.3f} cos={cos:.3f} L2={l2:.3f} {quality}")
+        if verbose:
+            quality = "✓" if ssim > 0.5 else ("~" if ssim > 0.2 else "✗")
+            print(f"  {label} {i:2d}: SSIM={ssim:.3f} cos={cos:.3f} L2={l2:.3f} {quality}")
     return results
 
 
@@ -371,13 +335,16 @@ print("  Pre-training VAE on all images...")
 vae_opt = torch.optim.Adam(img_model.vae.parameters(), lr=1e-3)
 img_model.vae.train()
 t0 = time.time()
-for step in range(300):
-    recon, mu, logvar = img_model.vae(target_images)
-    loss, info = img_model.vae.loss(target_images, recon, mu, logvar)
+for step in range(1000):
+    # Mini-batch VAE training for larger dataset
+    vae_idx = torch.randint(0, N_TOTAL, (min(32, N_TOTAL),))
+    vae_batch = target_images[vae_idx]
+    recon, mu, logvar = img_model.vae(vae_batch)
+    loss, info = img_model.vae.loss(vae_batch, recon, mu, logvar)
     vae_opt.zero_grad()
     loss.backward()
     vae_opt.step()
-    if step % 100 == 0:
+    if step % 200 == 0:
         print(f"    VAE step {step}: recon={info['recon']:.6f} kl={info['kl']:.4f} ({time.time()-t0:.0f}s)")
 img_model.vae.eval()
 
@@ -389,15 +356,17 @@ print(f"  Latent shape: {img_latents.shape}")
 
 # Train flow matching — ONLY on training set
 print(f"  Training flow matching on {N_TRAIN} training samples...")
-img_losses = train_loop(img_model, "image", n_steps=2000, lr=3e-3,
+img_losses = train_loop(img_model, "image", n_steps=5000, lr=3e-3,
                         cached_latents=img_latents, n_train=N_TRAIN)
 
-# Evaluate on TRAIN set
-print("\n  === TRAIN SET EVALUATION ===")
-train_img_results = evaluate_images(img_model, train_idx, brain_patterns_img, target_images, "TRAIN")
+# Evaluate on TRAIN set (show first 8 only)
+print(f"\n  === TRAIN SET EVALUATION ({N_TRAIN} samples, showing first 8) ===")
+train_img_results_partial = evaluate_images(img_model, train_idx[:8], brain_patterns_img, target_images, "TRAIN")
+train_img_results_rest = evaluate_images(img_model, train_idx[8:], brain_patterns_img, target_images, "TRAIN", verbose=False)
+train_img_results = {**train_img_results_partial, **train_img_results_rest}
 
 # Evaluate on TEST set (HELD OUT — never seen during training)
-print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+print(f"\n  === TEST SET EVALUATION ({N_TEST} held-out samples) ===")
 test_img_results = evaluate_images(img_model, test_idx, brain_patterns_img, target_images, "TEST ")
 
 train_cos_img = sum(r["cos"] for r in train_img_results.values()) / N_TRAIN
@@ -419,10 +388,10 @@ audio_model = build_brain2audio(
     n_voxels=N_VOXELS, n_mels=N_MELS, audio_len=AUDIO_LEN,
     hidden_dim=32, depth=2,
 )
-audio_losses = train_loop(audio_model, "audio", n_steps=2000, lr=3e-3, n_train=N_TRAIN)
+audio_losses = train_loop(audio_model, "audio", n_steps=3000, lr=3e-3, n_train=N_TRAIN)
 
 audio_model.eval()
-print("\n  === TRAIN SET EVALUATION ===")
+print(f"\n  === TRAIN SET (showing first 8 of {N_TRAIN}) ===")
 train_audio_results = {}
 for i in train_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
@@ -433,20 +402,38 @@ for i in train_idx:
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
     train_audio_results[i] = {"cos": cos}
-    print(f"  TRAIN {i:2d}: cos={cos:.3f}")
+    if i < 8:
+        print(f"  TRAIN {i:2d}: cos={cos:.3f}")
 
-print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+print(f"\n  === TEST SET ({N_TEST} held-out) ===")
 test_audio_results = {}
+all_audio_outputs = []
 for i in test_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
     out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+    all_audio_outputs.append(out.output[0].detach())
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
     test_audio_results[i] = {"cos": cos}
     print(f"  TEST  {i:2d}: cos={cos:.3f}")
+
+# Degeneracy check: are outputs actually different for different inputs?
+if len(all_audio_outputs) > 1:
+    out_stack = torch.stack(all_audio_outputs)
+    inter_cos = []
+    for a in range(len(out_stack)):
+        for b in range(a + 1, len(out_stack)):
+            c = F.cosine_similarity(
+                out_stack[a].flatten().unsqueeze(0),
+                out_stack[b].flatten().unsqueeze(0),
+            ).item()
+            inter_cos.append(c)
+    mean_inter = sum(inter_cos) / len(inter_cos)
+    print(f"\n  Degeneracy check: mean inter-output cos={mean_inter:.3f}"
+          f" ({'DIVERSE' if mean_inter < 0.95 else 'DEGENERATE — outputs too similar'})")
 
 train_cos_aud = sum(r["cos"] for r in train_audio_results.values()) / N_TRAIN
 test_cos_aud = sum(r["cos"] for r in test_audio_results.values()) / N_TEST
@@ -464,10 +451,10 @@ print("=" * 70)
 text_model = build_brain2text(
     n_voxels=N_VOXELS, max_len=8, hidden_dim=64, depth=3,
 )
-text_losses = train_loop(text_model, "text", n_steps=1000, lr=3e-3, n_train=N_TRAIN)
+text_losses = train_loop(text_model, "text", n_steps=2000, lr=3e-3, n_train=N_TRAIN)
 
 text_model.eval()
-print("\n  === TRAIN SET EVALUATION ===")
+print(f"\n  === TRAIN SET (showing first 8 of {N_TRAIN}) ===")
 train_text_results = {}
 for i in train_idx:
     brain = BrainData(voxels=brain_patterns_txt[i:i + 1])
@@ -475,10 +462,11 @@ for i in train_idx:
     gen = out.metadata["texts"][0][:4]
     exact = gen == words[i][:4]
     train_text_results[i] = {"generated": gen, "target": words[i], "exact": exact}
-    mark = "✓" if exact else "✗"
-    print(f"  TRAIN {i:2d}: brain → {repr(gen):8s} (target: {words[i]:4s}) {mark}")
+    if i < 8:
+        mark = "✓" if exact else "✗"
+        print(f"  TRAIN {i:2d}: brain → {repr(gen):8s} (target: {words[i]:4s}) {mark}")
 
-print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+print(f"\n  === TEST SET ({N_TEST} held-out) ===")
 test_text_results = {}
 for i in test_idx:
     brain = BrainData(voxels=brain_patterns_txt[i:i + 1])
@@ -557,7 +545,7 @@ results = {
         "final_loss": text_losses[-1],
         "train": {"exact_match": train_correct, "total": N_TRAIN},
         "test":  {"exact_match": test_correct, "total": N_TEST},
-        "results": {words[i]: all_text_results[i]["generated"] for i in range(N_TOTAL)},
+        "results": {words[i]: all_text_results[i]["generated"] for i in test_idx},
     },
     "diversity": {
         "brain_noise": 0.15,
@@ -599,7 +587,7 @@ try:
 
     # Image reconstructions: 4-row grid (train targets, train recons, TEST targets, TEST recons)
     n_train_show = min(8, N_TRAIN)
-    n_test_show = N_TEST
+    n_test_show = min(8, N_TEST)
     n_cols = max(n_train_show, n_test_show)
     fig, axes = plt.subplots(4, n_cols, figsize=(3 * n_cols, 12))
 
@@ -665,18 +653,19 @@ try:
     print(f"  Saved {OUT}/audio_reconstructions.png")
 
     # Text results
-    fig, ax = plt.subplots(figsize=(8, 7))
+    fig, ax = plt.subplots(figsize=(8, 10))
     ax.axis("off")
-    lines = ["Brain → Text: Train vs Test\n", "  TRAIN SET:"]
-    for i in train_idx:
+    lines = ["Brain → Text: Train vs Test (discrete memorization task)\n",
+             "  TRAIN SET (first 16):"]
+    for i in train_idx[:16]:
         r = train_text_results[i]
         mark = "✓" if r["exact"] else "✗"
-        lines.append(f"    {i:2d}: {repr(r['generated']):8s} target={r['target']:4s} {mark}")
-    lines.append(f"\n  TEST SET (HELD OUT):")
+        lines.append(f"    {i:3d}: {repr(r['generated']):8s} target={r['target']:5s} {mark}")
+    lines.append(f"\n  TEST SET (HELD OUT — all {N_TEST}):")
     for i in test_idx:
         r = test_text_results[i]
         mark = "✓" if r["exact"] else "✗"
-        lines.append(f"    {i:2d}: {repr(r['generated']):8s} target={r['target']:4s} {mark}")
+        lines.append(f"    {i:3d}: {repr(r['generated']):8s} target={r['target']:5s} {mark}")
     lines.append(f"\n  Train: {train_correct}/{N_TRAIN}  Test: {test_correct}/{N_TEST}")
     ax.text(0.05, 0.95, "\n".join(lines), transform=ax.transAxes,
             fontsize=9, verticalalignment="top", fontfamily="monospace")
@@ -739,9 +728,11 @@ print(f"\n  Brain → Audio:")
 print(f"    TRAIN: cos={train_cos_aud:.3f}")
 print(f"    TEST:  cos={test_cos_aud:.3f}")
 print(f"    Gap:   {train_cos_aud - test_cos_aud:.3f}")
-print(f"\n  Brain → Text:")
+print(f"    NOTE:  mel targets from synthesize_audio are nearly uniform —")
+print(f"           high cos reflects target similarity, not reconstruction quality")
+print(f"\n  Brain → Text (discrete memorization — no semantic embedding):")
 print(f"    TRAIN: {train_correct}/{N_TRAIN}")
-print(f"    TEST:  {test_correct}/{N_TEST}")
+print(f"    TEST:  {test_correct}/{N_TEST} (expected: 0 — byte-level has no generalization path)")
 print(f"\n  Diversity: mean L2={mean_diversity:.4f} (brain_noise=0.15)")
 
 all_pass = (test_cos_img > 0.3 and test_cos_aud > 0.3 and mean_diversity > 0.01)
