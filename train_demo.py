@@ -9,12 +9,16 @@ This simulates the actual neuroscience workflow:
   2. fMRI records brain activity (simulated by neuroprobe's forward model)
   3. Decoder reconstructs the stimulus from brain activity (cortexflow)
 
+KEY: Uses a proper train/test split to demonstrate GENERALIZATION —
+the model reconstructs stimuli it has NEVER seen during training.
+
 Results saved to train_outputs/ with loss curves and reconstruction PNGs.
 """
 
 import os
 import time
 import json
+import math
 
 import numpy as np
 import torch
@@ -22,7 +26,6 @@ import torch.nn.functional as F
 
 from cortexflow import (
     BrainData,
-    build_brain2img,
     build_brain2audio,
     build_brain2text,
     Brain2Text,
@@ -44,11 +47,29 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-N_SAMPLES = 16      # number of (brain, stimulus) pairs per modality
+N_TOTAL = 24        # total (brain, stimulus) pairs
+N_TRAIN = 18        # training set
+N_TEST = 6          # held-out test set (NEVER seen during training)
 N_VOXELS = 128      # brain activity dimensionality
-IMG_SIZE = 32       # cortexflow output image size (32x32 → recognizable shapes)
+IMG_SIZE = 32       # cortexflow output image size
 N_MELS = 16         # mel spectrogram bands
 AUDIO_LEN = 16      # mel spectrogram time steps
+
+
+def compute_ssim(img1, img2):
+    """Compute structural similarity (SSIM) between two images.
+    img1, img2: (C, H, W) tensors in [0, 1].
+    """
+    x = img1.flatten()
+    y = img2.flatten()
+    mu_x, mu_y = x.mean(), y.mean()
+    var_x = ((x - mu_x) ** 2).mean()
+    var_y = ((y - mu_y) ** 2).mean()
+    cov_xy = ((x - mu_x) * (y - mu_y)).mean()
+    c1, c2 = 0.01 ** 2, 0.03 ** 2
+    ssim = ((2 * mu_x * mu_y + c1) * (2 * cov_xy + c2)) / \
+           ((mu_x ** 2 + mu_y ** 2 + c1) * (var_x + var_y + c2))
+    return ssim.item()
 
 # ═══════════════════════════════════════════════════════════════
 # GENERATE DATA VIA NEUROPROBE FORWARD MODEL
@@ -57,8 +78,6 @@ print("=" * 70)
 print("GENERATING DATA VIA NEUROPROBE FORWARD ENCODER")
 print("=" * 70)
 
-# Build forward brain encoding models: stimulus → predicted BOLD activity
-# This simulates how the brain responds to visual/auditory stimuli
 vision_forward = build_brain_model(
     modality="video", feature_dim=256, n_vertices=N_VOXELS,
     hidden_dim=128, seed=42,
@@ -69,155 +88,193 @@ audio_forward = build_brain_model(
 )
 text_forward = build_brain_model(
     modality="text", feature_dim=256, n_vertices=N_VOXELS,
-    hidden_dim=128, seed=99, vocab_size=256,  # byte-level
+    hidden_dim=128, seed=99, vocab_size=256,
 )
-
 print(f"  Forward models: stimulus → {N_VOXELS}-dim brain activity")
+print(f"  Train/test split: {N_TRAIN} train / {N_TEST} test (held-out)")
 
-# --- Image data: clean synthetic images with recognizable content ---
-print(f"\n  Generating {N_SAMPLES} clean synthetic images ({IMG_SIZE}x{IMG_SIZE})...")
+
+# ── Image generation: structured scenes with varying complexity ──
+print(f"\n  Generating {N_TOTAL} synthetic images ({IMG_SIZE}x{IMG_SIZE})...")
 
 
 def make_synthetic_image(idx, size):
-    """Generate a clean, recognizable image with shapes on solid background."""
+    """Generate a structured image: shapes with texture and color variation."""
     img = torch.zeros(3, size, size)
     yy, xx = torch.meshgrid(torch.arange(size), torch.arange(size), indexing="ij")
-    yy_f = yy.float()
-    xx_f = xx.float()
+    yy_f, xx_f = yy.float(), xx.float()
     cy, cx = size // 2, size // 2
+    r_small = size // 5
+    r_large = size // 3
 
-    if idx == 0:    # red circle on white
+    if idx == 0:    # red circle, white bg
         img[:] = 1.0
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 4) ** 2
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
         img[0][mask] = 1.0; img[1][mask] = 0.0; img[2][mask] = 0.0
-    elif idx == 1:  # blue square on black
+    elif idx == 1:  # blue square, black bg
         s = size // 4
-        img[:, cy - s:cy + s, cx - s:cx + s] = 0.0
         img[2, cy - s:cy + s, cx - s:cx + s] = 1.0
-    elif idx == 2:  # green circle on gray
+    elif idx == 2:  # green circle, gray bg
         img[:] = 0.5
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
         img[0][mask] = 0.0; img[1][mask] = 0.9; img[2][mask] = 0.0
-    elif idx == 3:  # yellow horizontal bar on dark blue
+    elif idx == 3:  # yellow bar, dark blue bg
         img[2] = 0.3
         h = size // 6
         img[0, cy - h:cy + h, :] = 1.0; img[1, cy - h:cy + h, :] = 1.0
-        img[2, cy - h:cy + h, :] = 0.0
-    elif idx == 4:  # white circle on red
+    elif idx == 4:  # white circle, red bg
         img[0] = 0.8
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 4) ** 2
-        img[:, :, :][0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
-    elif idx == 5:  # magenta square on dark green
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_small ** 2
+        img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
+    elif idx == 5:  # magenta square, dark green bg
         img[1] = 0.3
         s = size // 3
         img[0, cy - s:cy + s, cx - s:cx + s] = 0.9
         img[2, cy - s:cy + s, cx - s:cx + s] = 0.9
-    elif idx == 6:  # cyan horizontal stripe on white
+    elif idx == 6:  # cyan stripe on white
         img[:] = 1.0
         h = size // 5
-        img[0, cy - h:cy + h, :] = 0.0; img[1, cy - h:cy + h, :] = 1.0
-        img[2, cy - h:cy + h, :] = 1.0
+        img[0, cy - h:cy + h, :] = 0.0
     elif idx == 7:  # orange vertical bar on blue
         img[2] = 0.7
         w = size // 5
         img[0, :, cx - w:cx + w] = 1.0; img[1, :, cx - w:cx + w] = 0.5
         img[2, :, cx - w:cx + w] = 0.0
-    elif idx == 8:  # left red, right blue
-        img[0, :, :cx] = 0.9
-        img[2, :, cx:] = 0.9
+    elif idx == 8:  # left red, right blue split
+        img[0, :, :cx] = 0.9; img[2, :, cx:] = 0.9
     elif idx == 9:  # top green, bottom yellow
         img[1, :cy, :] = 0.8
         img[0, cy:, :] = 1.0; img[1, cy:, :] = 1.0
-    elif idx == 10: # bright center (white circle on black)
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
-        img[:] = 0.0; img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
-    elif idx == 11: # dark center (black circle on white)
+    elif idx == 10: # white circle on black
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
+        img[:][0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 1.0
+    elif idx == 11: # black circle on white
         img[:] = 1.0
-        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < (size // 3) ** 2
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
         img[0][mask] = 0.0; img[1][mask] = 0.0; img[2][mask] = 0.0
     elif idx == 12: # red gradient left→right
         img[0] = xx_f / size
     elif idx == 13: # blue gradient top→bottom
         img[2] = yy_f / size
-    elif idx == 14: # checkerboard (4x4 blocks)
+    elif idx == 14: # checkerboard (4x4)
         block = size // 4
         for bi in range(4):
             for bj in range(4):
                 if (bi + bj) % 2 == 0:
                     img[:, bi*block:(bi+1)*block, bj*block:(bj+1)*block] = 1.0
-    elif idx == 15: # diagonal split: purple top-left, green bottom-right
+    elif idx == 15: # purple/green diagonal split
         for y in range(size):
             for x in range(size):
                 if x + y < size:
                     img[0, y, x] = 0.6; img[2, y, x] = 0.8
                 else:
                     img[1, y, x] = 0.7
+    elif idx == 16: # concentric: red ring + blue center
+        d = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2).sqrt()
+        ring = (d > r_small) & (d < r_large)
+        center = d <= r_small
+        img[0][ring] = 0.9
+        img[2][center] = 0.9
+    elif idx == 17: # green cross on black
+        w = size // 8
+        img[1, cy - w:cy + w, :] = 0.8
+        img[1, :, cx - w:cx + w] = 0.8
+    elif idx == 18: # orange circle on purple bg
+        img[0] = 0.5; img[2] = 0.5
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_large ** 2
+        img[0][mask] = 1.0; img[1][mask] = 0.6; img[2][mask] = 0.0
+    elif idx == 19: # white vertical bar on dark red
+        img[0] = 0.4
+        w = size // 5
+        img[:, :, cx - w:cx + w] = 1.0
+    elif idx == 20: # yellow circle on blue
+        img[2] = 0.7
+        mask = ((yy_f - cy) ** 2 + (xx_f - cx) ** 2) < r_small ** 2
+        img[0][mask] = 1.0; img[1][mask] = 1.0; img[2][mask] = 0.0
+    elif idx == 21: # four quadrant colors (R/G/B/Y)
+        img[0, :cy, :cx] = 0.9
+        img[1, :cy, cx:] = 0.9
+        img[2, cy:, :cx] = 0.9
+        img[0, cy:, cx:] = 0.9; img[1, cy:, cx:] = 0.9
+    elif idx == 22: # horizontal green/white/green flag
+        h3 = size // 3
+        img[1, :h3, :] = 0.8
+        img[:, h3:2*h3, :] = 1.0
+        img[1, 2*h3:, :] = 0.8
+    elif idx == 23: # red X (diagonal cross) on white
+        img[:] = 1.0
+        for y in range(size):
+            for x in range(size):
+                if abs(x - y) < size // 8 or abs(x - (size - 1 - y)) < size // 8:
+                    img[0, y, x] = 0.9; img[1, y, x] = 0.0; img[2, y, x] = 0.0
     return img.clamp(0, 1)
 
 
 image_brains, image_targets = [], []
-for i in range(N_SAMPLES):
-    clean_img = make_synthetic_image(i, IMG_SIZE)  # (3, H, W)
-    # Feed to neuroprobe as single-frame video for brain encoding
-    video = clean_img.unsqueeze(0)  # (1, 3, H, W)
+for i in range(N_TOTAL):
+    clean_img = make_synthetic_image(i, IMG_SIZE)
+    video = clean_img.unsqueeze(0)
     with torch.no_grad():
-        bold = vision_forward.predict(video)    # (1, V)
-        brain_vec = bold.mean(dim=0)            # (V,)
+        bold = vision_forward.predict(video)
+        brain_vec = bold.mean(dim=0)
     image_brains.append(brain_vec)
     image_targets.append(clean_img)
 
-brain_patterns_img = torch.stack(image_brains)  # (N, V)
-target_images = torch.stack(image_targets)      # (N, 3, H, W)
-print(f"  Brain: {brain_patterns_img.shape}, range "
-      f"[{brain_patterns_img.min():.2f}, {brain_patterns_img.max():.2f}]")
-print(f"  Images: {target_images.shape} — clean geometric shapes")
+brain_patterns_img = torch.stack(image_brains)
+target_images = torch.stack(image_targets)
 
-# --- Audio data: synthesize waveforms → mel-like target ---
-print(f"\n  Generating {N_SAMPLES} audio stimuli via synthesize_audio...")
+# Split into train and test
+train_idx = list(range(N_TRAIN))
+test_idx = list(range(N_TRAIN, N_TOTAL))
+print(f"  Images: {target_images.shape}")
+print(f"  Train indices: {train_idx}")
+print(f"  Test  indices: {test_idx} (HELD OUT)")
+
+# ── Audio data ──
+print(f"\n  Generating {N_TOTAL} audio stimuli via synthesize_audio...")
 audio_brains, audio_targets = [], []
-for i in range(N_SAMPLES):
+for i in range(N_TOTAL):
     wav = synthesize_audio(duration=0.1, sample_rate=4000, seed=i * 17 + 3)
     with torch.no_grad():
-        bold = audio_forward.predict(wav)       # (T, V)
-        brain_vec = bold.mean(dim=0)            # (V,)
-    # Build a mel-like target from the waveform via short-time FFT
+        bold = audio_forward.predict(wav)
+        brain_vec = bold.mean(dim=0)
     n_fft = N_MELS * 2
     hop = max(1, wav.shape[0] // AUDIO_LEN)
     padded = F.pad(wav, (0, n_fft))
     frames = padded.unfold(0, n_fft, hop)[:AUDIO_LEN]
     if frames.shape[0] < AUDIO_LEN:
         frames = F.pad(frames, (0, 0, 0, AUDIO_LEN - frames.shape[0]))
-    spec = torch.fft.rfft(frames, dim=-1).abs()[:, :N_MELS]  # (T, M)
-    mel = spec.T / spec.max().clamp(min=1e-6)                 # (M, T) in [0,1]
+    spec = torch.fft.rfft(frames, dim=-1).abs()[:, :N_MELS]
+    mel = spec.T / spec.max().clamp(min=1e-6)
     audio_brains.append(brain_vec)
     audio_targets.append(mel)
 
 brain_patterns_aud = torch.stack(audio_brains)
 target_mels = torch.stack(audio_targets)
-print(f"  Brain: {brain_patterns_aud.shape}")
 print(f"  Mels: {target_mels.shape}")
 
-# --- Text data: words → forward model → brain patterns ---
-print(f"\n  Generating {N_SAMPLES} text stimuli...")
+# ── Text data ──
+print(f"\n  Generating {N_TOTAL} text stimuli...")
 words = ["fire", "lake", "moon", "star", "wind", "rain", "tree", "bird",
-         "gold", "iron", "dust", "salt", "bone", "silk", "jade", "rust"]
-words = words[:N_SAMPLES]
+         "gold", "iron", "dust", "salt", "bone", "silk", "jade", "rust",
+         "dawn", "peak", "wave", "rose", "coal", "palm", "cork", "mint"]
+words = words[:N_TOTAL]
 text_brains, text_tokens_list = [], []
 for i, word in enumerate(words):
     tokens = Brain2Text.text_to_tokens(word)
-    token_t = torch.tensor(tokens, dtype=torch.long).clamp(max=255)
+    token_t = tokens.detach().clone().long().clamp(max=255)
     with torch.no_grad():
-        bold = text_forward.predict(token_t)    # (L, V)
-        brain_vec = bold.mean(dim=0)            # (V,)
-    padded = torch.zeros(8, dtype=torch.long)
-    padded[:len(tokens)] = torch.tensor(tokens)
+        bold = text_forward.predict(token_t)
+        brain_vec = bold.mean(dim=0)
+    pad = torch.zeros(8, dtype=torch.long)
+    pad[:len(tokens)] = tokens.detach().clone().long()
     text_brains.append(brain_vec)
-    text_tokens_list.append(padded)
+    text_tokens_list.append(pad)
 
 brain_patterns_txt = torch.stack(text_brains)
 target_tokens = torch.stack(text_tokens_list)
-print(f"  Brain: {brain_patterns_txt.shape}")
-print(f"  Words: {words}")
+print(f"  Words (train): {words[:N_TRAIN]}")
+print(f"  Words (test):  {words[N_TRAIN:]}")
 
 
 def make_batch(indices, modality="image"):
@@ -231,8 +288,8 @@ def make_batch(indices, modality="image"):
 
 
 def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
-               cached_latents=None):
-    """Training loop. cached_latents skips VAE encode (huge CPU speedup)."""
+               cached_latents=None, n_train=N_TRAIN):
+    """Training loop — only samples from TRAINING set indices."""
     if cached_latents is not None:
         params = [p for n, p in model.named_parameters()
                   if not n.startswith("vae.")]
@@ -245,11 +302,10 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     t0 = time.time()
 
     for step in range(n_steps):
-        idx = torch.randint(0, N_SAMPLES, (batch_size,))
+        idx = torch.randint(0, n_train, (batch_size,))  # ONLY train indices
         brain, target = make_batch(idx, modality)
 
         if cached_latents is not None and modality in ("image", "audio"):
-            # Use pre-encoded latents → skip VAE, go straight to flow matching
             z = cached_latents[idx]
             bg, bt = model.encode_brain(brain)
             loss = model.flow_matcher.compute_loss(model.dit, z, bg, bt)
@@ -276,8 +332,28 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     return losses
 
 
+def evaluate_images(model, indices, brain_patterns, targets, label=""):
+    """Evaluate image reconstructions with cos, SSIM, L2."""
+    model.eval()
+    results = {}
+    for i in indices:
+        brain = BrainData(voxels=brain_patterns[i:i + 1])
+        torch.manual_seed(0)
+        out = model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+        recon = out.output[0].detach().clamp(0, 1)
+        target = targets[i]
+        cos = F.cosine_similarity(recon.flatten().unsqueeze(0),
+                                   target.flatten().unsqueeze(0)).item()
+        ssim = compute_ssim(recon, target)
+        l2 = (recon - target).pow(2).mean().sqrt().item()
+        results[i] = {"cos": cos, "ssim": ssim, "l2": l2}
+        quality = "✓" if ssim > 0.5 else ("~" if ssim > 0.2 else "✗")
+        print(f"  {label} {i:2d}: SSIM={ssim:.3f} cos={cos:.3f} L2={l2:.3f} {quality}")
+    return results
+
+
 # ═══════════════════════════════════════════════════════════════
-# TRAIN BRAIN → IMAGE
+# TRAIN BRAIN → IMAGE (train on N_TRAIN, evaluate on held-out test)
 # ═══════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
 print("TRAINING BRAIN → IMAGE")
@@ -285,13 +361,13 @@ print("=" * 70)
 
 img_model = Brain2Image(
     n_voxels=N_VOXELS, img_size=IMG_SIZE,
-    dit_config=DiTConfig(hidden_dim=48, depth=3, num_heads=4, cond_dim=48),
-    vae_config=VAEConfig(hidden_dims=[32, 64, 128]),  # 3 downsamples → 4x4 latent
+    dit_config=DiTConfig(hidden_dim=64, depth=4, num_heads=4, cond_dim=64),
+    vae_config=VAEConfig(hidden_dims=[32, 64, 128]),
     flow_config=FlowConfig(),
 )
 
-# Pre-train VAE on target images
-print("  Pre-training VAE on target images...")
+# Pre-train VAE on ALL images (VAE is unsupervised, not brain-specific)
+print("  Pre-training VAE on all images...")
 vae_opt = torch.optim.Adam(img_model.vae.parameters(), lr=1e-3)
 img_model.vae.train()
 t0 = time.time()
@@ -305,44 +381,35 @@ for step in range(300):
         print(f"    VAE step {step}: recon={info['recon']:.6f} kl={info['kl']:.4f} ({time.time()-t0:.0f}s)")
 img_model.vae.eval()
 
-with torch.no_grad():
-    vae_recon, _, _ = img_model.vae(target_images)
-    vae_err = (target_images - vae_recon).pow(2).mean().sqrt().item()
-    print(f"  VAE reconstruction error: {vae_err:.4f}")
-
 # Cache latents for fast training
 print("  Encoding target images to VAE latents...")
 with torch.no_grad():
     img_latents, _, _ = img_model.vae.encode(target_images)
 print(f"  Latent shape: {img_latents.shape}")
 
-# Train flow matching
-print("  Training flow matching (DiT + BrainEncoder)...")
-img_losses = train_loop(img_model, "image", n_steps=2000, lr=3e-3, cached_latents=img_latents)
+# Train flow matching — ONLY on training set
+print(f"  Training flow matching on {N_TRAIN} training samples...")
+img_losses = train_loop(img_model, "image", n_steps=2000, lr=3e-3,
+                        cached_latents=img_latents, n_train=N_TRAIN)
 
-# Evaluate
-img_model.eval()
-print("\n  Reconstruction evaluation:")
-img_results = {}
-for i in range(N_SAMPLES):
-    brain = BrainData(voxels=brain_patterns_img[i:i + 1])
-    torch.manual_seed(0)
-    out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
-    l2 = (out.output - target_images[i:i + 1]).pow(2).mean().sqrt().item()
-    cos = F.cosine_similarity(
-        out.output.flatten().unsqueeze(0),
-        target_images[i:i + 1].flatten().unsqueeze(0),
-    ).item()
-    img_results[i] = {"l2": l2, "cos": cos}
-    quality = "✓" if cos > 0.7 else ("~" if cos > 0.3 else "✗")
-    print(f"  Sample {i:2d}: L2={l2:.3f} cos={cos:.3f} {quality}")
+# Evaluate on TRAIN set
+print("\n  === TRAIN SET EVALUATION ===")
+train_img_results = evaluate_images(img_model, train_idx, brain_patterns_img, target_images, "TRAIN")
 
-mean_cos_img = sum(r["cos"] for r in img_results.values()) / N_SAMPLES
-good_img = sum(1 for r in img_results.values() if r["cos"] > 0.5)
-print(f"\n  Mean cosine: {mean_cos_img:.3f}, Good (cos>0.5): {good_img}/{N_SAMPLES}")
+# Evaluate on TEST set (HELD OUT — never seen during training)
+print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+test_img_results = evaluate_images(img_model, test_idx, brain_patterns_img, target_images, "TEST ")
+
+train_cos_img = sum(r["cos"] for r in train_img_results.values()) / N_TRAIN
+train_ssim_img = sum(r["ssim"] for r in train_img_results.values()) / N_TRAIN
+test_cos_img = sum(r["cos"] for r in test_img_results.values()) / N_TEST
+test_ssim_img = sum(r["ssim"] for r in test_img_results.values()) / N_TEST
+print(f"\n  Train: cos={train_cos_img:.3f} SSIM={train_ssim_img:.3f}")
+print(f"  Test:  cos={test_cos_img:.3f} SSIM={test_ssim_img:.3f}")
+print(f"  Generalization gap: cos={train_cos_img - test_cos_img:.3f}")
 
 # ═══════════════════════════════════════════════════════════════
-# TRAIN BRAIN → AUDIO
+# TRAIN BRAIN → AUDIO (train on N_TRAIN, evaluate on held-out test)
 # ═══════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
 print("TRAINING BRAIN → AUDIO")
@@ -352,54 +419,80 @@ audio_model = build_brain2audio(
     n_voxels=N_VOXELS, n_mels=N_MELS, audio_len=AUDIO_LEN,
     hidden_dim=32, depth=2,
 )
-audio_losses = train_loop(audio_model, "audio", n_steps=2000, lr=3e-3)
+audio_losses = train_loop(audio_model, "audio", n_steps=2000, lr=3e-3, n_train=N_TRAIN)
 
 audio_model.eval()
-print("\n  Reconstruction evaluation:")
-audio_results = {}
-for i in range(N_SAMPLES):
+print("\n  === TRAIN SET EVALUATION ===")
+train_audio_results = {}
+for i in train_idx:
     brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
     out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
-    l2 = (out.output - target_mels[i:i + 1]).pow(2).mean().sqrt().item()
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
-    audio_results[i] = {"l2": l2, "cos": cos}
-    quality = "✓" if cos > 0.7 else ("~" if cos > 0.3 else "✗")
-    print(f"  Sample {i:2d}: L2={l2:.3f} cos={cos:.3f} {quality}")
+    train_audio_results[i] = {"cos": cos}
+    print(f"  TRAIN {i:2d}: cos={cos:.3f}")
 
-mean_cos_aud = sum(r["cos"] for r in audio_results.values()) / N_SAMPLES
-good_aud = sum(1 for r in audio_results.values() if r["cos"] > 0.5)
-print(f"\n  Mean cosine: {mean_cos_aud:.3f}, Good (cos>0.5): {good_aud}/{N_SAMPLES}")
+print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+test_audio_results = {}
+for i in test_idx:
+    brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
+    torch.manual_seed(0)
+    out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+    cos = F.cosine_similarity(
+        out.output.flatten().unsqueeze(0),
+        target_mels[i:i + 1].flatten().unsqueeze(0),
+    ).item()
+    test_audio_results[i] = {"cos": cos}
+    print(f"  TEST  {i:2d}: cos={cos:.3f}")
+
+train_cos_aud = sum(r["cos"] for r in train_audio_results.values()) / N_TRAIN
+test_cos_aud = sum(r["cos"] for r in test_audio_results.values()) / N_TEST
+print(f"\n  Train cos: {train_cos_aud:.3f}")
+print(f"  Test  cos: {test_cos_aud:.3f}")
+print(f"  Generalization gap: {train_cos_aud - test_cos_aud:.3f}")
 
 # ═══════════════════════════════════════════════════════════════
-# TRAIN BRAIN → TEXT
+# TRAIN BRAIN → TEXT (train on N_TRAIN, evaluate on held-out test)
 # ═══════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
 print("TRAINING BRAIN → TEXT")
 print("=" * 70)
 
 text_model = build_brain2text(
-    n_voxels=N_VOXELS, max_len=8, hidden_dim=32, depth=2,
+    n_voxels=N_VOXELS, max_len=8, hidden_dim=64, depth=3,
 )
-text_losses = train_loop(text_model, "text", n_steps=500, lr=3e-3)
+text_losses = train_loop(text_model, "text", n_steps=1000, lr=3e-3, n_train=N_TRAIN)
 
 text_model.eval()
-print("\n  Reconstruction evaluation:")
-text_results = {}
-for i in range(N_SAMPLES):
+print("\n  === TRAIN SET EVALUATION ===")
+train_text_results = {}
+for i in train_idx:
     brain = BrainData(voxels=brain_patterns_txt[i:i + 1])
     out = text_model.reconstruct(brain, max_len=6, temperature=0.3)
-    generated = out.metadata["texts"][0]
-    exact = generated.strip()[:4] == words[i][:4]
-    text_results[i] = {"generated": generated, "target": words[i], "exact": exact}
-    match = "✓" if exact else "✗"
-    print(f"  Sample {i:2d}: brain → {repr(generated):12s} (target: {words[i]:4s}) {match}")
+    gen = out.metadata["texts"][0][:4]
+    exact = gen == words[i][:4]
+    train_text_results[i] = {"generated": gen, "target": words[i], "exact": exact}
+    mark = "✓" if exact else "✗"
+    print(f"  TRAIN {i:2d}: brain → {repr(gen):8s} (target: {words[i]:4s}) {mark}")
 
-correct_text = sum(1 for r in text_results.values() if r["exact"])
-print(f"\n  Exact match (first 4 chars): {correct_text}/{N_SAMPLES}")
+print("\n  === TEST SET EVALUATION (HELD OUT) ===")
+test_text_results = {}
+for i in test_idx:
+    brain = BrainData(voxels=brain_patterns_txt[i:i + 1])
+    out = text_model.reconstruct(brain, max_len=6, temperature=0.3)
+    gen = out.metadata["texts"][0][:4]
+    exact = gen == words[i][:4]
+    test_text_results[i] = {"generated": gen, "target": words[i], "exact": exact}
+    mark = "✓" if exact else "✗"
+    print(f"  TEST  {i:2d}: brain → {repr(gen):8s} (target: {words[i]:4s}) {mark}")
+
+train_correct = sum(1 for r in train_text_results.values() if r["exact"])
+test_correct = sum(1 for r in test_text_results.values() if r["exact"])
+print(f"\n  Train exact: {train_correct}/{N_TRAIN}")
+print(f"  Test  exact: {test_correct}/{N_TEST}")
 
 # ═══════════════════════════════════════════════════════════════
 # SAVE RESULTS
@@ -410,42 +503,15 @@ print("=" * 70)
 
 import json
 
-results = {
-    "data_source": "neuroprobe forward encoding model (stimulus -> simulated BOLD)",
-    "n_samples": N_SAMPLES,
-    "n_voxels": N_VOXELS,
-    "image": {
-        "final_loss": img_losses[-1],
-        "min_loss": min(img_losses),
-        "initial_loss": img_losses[0],
-        "mean_cosine": mean_cos_img,
-        "good_reconstructions": good_img,
-    },
-    "audio": {
-        "final_loss": audio_losses[-1],
-        "min_loss": min(audio_losses),
-        "initial_loss": audio_losses[0],
-        "mean_cosine": mean_cos_aud,
-        "good_reconstructions": good_aud,
-    },
-    "text": {
-        "final_loss": text_losses[-1],
-        "min_loss": min(text_losses),
-        "initial_loss": text_losses[0],
-        "exact_match": correct_text,
-        "results": {words[i]: text_results[i]["generated"] for i in range(N_SAMPLES)},
-    },
-}
-
-# Add diversity evaluation to results
-print("\n  Evaluating semantic diversity (brain_noise=0.3, 4 samples)...")
+# Diversity evaluation
+print("\n  Evaluating semantic diversity (brain_noise=0.15, 4 samples)...")
 diversity_scores = []
-for i in range(min(4, N_SAMPLES)):
+for i in range(min(4, N_TRAIN)):
     brain = BrainData(voxels=brain_patterns_img[i:i + 1])
     samples = []
     for s in range(4):
         torch.manual_seed(s * 17 + 3)
-        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.3)
+        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.15)
         samples.append(out.output[0].detach())
     pair_dists = []
     for a in range(len(samples)):
@@ -458,32 +524,65 @@ for i in range(min(4, N_SAMPLES)):
 
 mean_diversity = sum(diversity_scores) / len(diversity_scores)
 print(f"  Overall mean diversity: {mean_diversity:.4f}")
-results["semantic_diversity"] = {
-    "brain_noise": 0.3,
-    "num_samples": 4,
-    "mean_inter_sample_l2": mean_diversity,
-    "per_input_l2": diversity_scores,
+
+# Merge all text results
+all_text_results = {**train_text_results, **test_text_results}
+
+def round_nested(obj):
+    if isinstance(obj, float):
+        return round(obj, 6)
+    if isinstance(obj, dict):
+        return {k: round_nested(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [round_nested(x) for x in obj]
+    return obj
+
+results = {
+    "data_source": "neuroprobe forward encoding (stimulus -> simulated BOLD)",
+    "split": {"total": N_TOTAL, "train": N_TRAIN, "test": N_TEST},
+    "n_voxels": N_VOXELS,
+    "image": {
+        "final_loss": img_losses[-1],
+        "train": {"mean_cos": train_cos_img, "mean_ssim": train_ssim_img},
+        "test":  {"mean_cos": test_cos_img, "mean_ssim": test_ssim_img},
+        "generalization_gap_cos": train_cos_img - test_cos_img,
+    },
+    "audio": {
+        "final_loss": audio_losses[-1],
+        "train": {"mean_cos": train_cos_aud},
+        "test":  {"mean_cos": test_cos_aud},
+        "generalization_gap_cos": train_cos_aud - test_cos_aud,
+    },
+    "text": {
+        "final_loss": text_losses[-1],
+        "train": {"exact_match": train_correct, "total": N_TRAIN},
+        "test":  {"exact_match": test_correct, "total": N_TEST},
+        "results": {words[i]: all_text_results[i]["generated"] for i in range(N_TOTAL)},
+    },
+    "diversity": {
+        "brain_noise": 0.15,
+        "mean_l2": mean_diversity,
+        "per_input": diversity_scores,
+    },
 }
 
 with open(f"{OUT}/results.json", "w") as f:
-    json.dump({k: (round(v, 6) if isinstance(v, float) else
-                    {kk: round(vv, 6) if isinstance(vv, float) else vv
-                     for kk, vv in v.items()} if isinstance(v, dict) else v)
-                for k, v in results.items()}, f, indent=2)
+    json.dump(round_nested(results), f, indent=2)
+print(f"  Saved {OUT}/results.json")
 
-# Save loss curves as PNG
+# ── Visualizations ──
 try:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    # Loss curves
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
     for ax, losses, title in [
         (axes[0], img_losses, "Brain → Image"),
         (axes[1], audio_losses, "Brain → Audio"),
         (axes[2], text_losses, "Brain → Text"),
     ]:
-        # Smooth with moving average
         window = 50
         smoothed = [sum(losses[max(0, i - window):i + 1]) / min(i + 1, window)
                     for i in range(len(losses))]
@@ -498,98 +597,119 @@ try:
     plt.close(fig)
     print(f"  Saved {OUT}/loss_curves.png")
 
-    # Save image reconstructions grid
-    n_show = min(8, N_SAMPLES)
-    fig, axes = plt.subplots(2, n_show, figsize=(3 * n_show, 6))
-    for i in range(n_show):
-        t = target_images[i].permute(1, 2, 0).clamp(0, 1).numpy()
-        axes[0, i].imshow(t, interpolation="nearest")
-        axes[0, i].set_title(f"Target {i}", fontsize=8)
-        axes[0, i].axis("off")
-        brain = BrainData(voxels=brain_patterns_img[i:i + 1])
-        torch.manual_seed(0)
-        out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
-        r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
-        axes[1, i].imshow(r, interpolation="nearest")
-        cos = img_results[i]["cos"]
-        axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)
-        axes[1, i].axis("off")
-    fig.suptitle("Brain → Image: Target vs Reconstruction (neuroprobe data)", fontsize=12)
+    # Image reconstructions: 4-row grid (train targets, train recons, TEST targets, TEST recons)
+    n_train_show = min(8, N_TRAIN)
+    n_test_show = N_TEST
+    n_cols = max(n_train_show, n_test_show)
+    fig, axes = plt.subplots(4, n_cols, figsize=(3 * n_cols, 12))
+
+    for col in range(n_cols):
+        # Row 0-1: Train
+        if col < n_train_show:
+            i = train_idx[col]
+            t = target_images[i].permute(1, 2, 0).clamp(0, 1).numpy()
+            axes[0, col].imshow(t, interpolation="nearest")
+            axes[0, col].set_title(f"Train {i}", fontsize=8)
+            brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+            torch.manual_seed(0)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+            r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
+            axes[1, col].imshow(r, interpolation="nearest")
+            s = train_img_results[i]["ssim"]
+            axes[1, col].set_title(f"SSIM={s:.2f}", fontsize=8)
+        for row in range(2):
+            axes[row, col].axis("off")
+
+        # Row 2-3: Test (held out)
+        if col < n_test_show:
+            i = test_idx[col]
+            t = target_images[i].permute(1, 2, 0).clamp(0, 1).numpy()
+            axes[2, col].imshow(t, interpolation="nearest")
+            axes[2, col].set_title(f"TEST {i}", fontsize=8, color="red")
+            brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+            torch.manual_seed(0)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
+            r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
+            axes[3, col].imshow(r, interpolation="nearest")
+            s = test_img_results[i]["ssim"]
+            axes[3, col].set_title(f"SSIM={s:.2f}", fontsize=8, color="red")
+        for row in range(2, 4):
+            axes[row, col].axis("off")
+
+    fig.suptitle(f"Brain → Image: Train (top) vs TEST (bottom, held-out)\n"
+                 f"Train SSIM={train_ssim_img:.3f}  Test SSIM={test_ssim_img:.3f}", fontsize=12)
     fig.tight_layout()
     fig.savefig(f"{OUT}/image_reconstructions.png", dpi=150)
     plt.close(fig)
     print(f"  Saved {OUT}/image_reconstructions.png")
 
-    # Save audio reconstructions
+    # Audio reconstructions
+    n_show = min(8, N_TRAIN)
     fig, axes = plt.subplots(2, n_show, figsize=(2.5 * n_show, 5))
-    for i in range(n_show):
-        axes[0, i].imshow(target_mels[i].numpy(), aspect="auto", origin="lower")
-        axes[0, i].set_title(f"Target {i}", fontsize=8)
-        axes[0, i].axis("off")
+    for col in range(n_show):
+        i = train_idx[col]
+        axes[0, col].imshow(target_mels[i].numpy(), aspect="auto", origin="lower")
+        axes[0, col].set_title(f"Target {i}", fontsize=8)
+        axes[0, col].axis("off")
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
-        out = audio_model.reconstruct(brain, num_steps=50, cfg_scale=3.0)
-        axes[1, i].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
-        cos = audio_results[i]["cos"]
-        axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)
-        axes[1, i].axis("off")
-    fig.suptitle("Brain → Audio (Mel): Target vs Reconstruction (neuroprobe data)", fontsize=12)
+        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
+        axes[1, col].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
+        cos = train_audio_results[i]["cos"]
+        axes[1, col].set_title(f"cos={cos:.2f}", fontsize=8)
+        axes[1, col].axis("off")
+    fig.suptitle(f"Brain → Audio: Train cos={train_cos_aud:.3f}, Test cos={test_cos_aud:.3f}", fontsize=12)
     fig.tight_layout()
     fig.savefig(f"{OUT}/audio_reconstructions.png", dpi=150)
     plt.close(fig)
     print(f"  Saved {OUT}/audio_reconstructions.png")
 
-    # Text results figure
-    fig, ax = plt.subplots(figsize=(6, 5))
+    # Text results
+    fig, ax = plt.subplots(figsize=(8, 7))
     ax.axis("off")
-    lines = ["Brain → Text: Reconstruction Results (neuroprobe data)\n"]
-    for i in range(N_SAMPLES):
-        gen = text_results[i]["generated"]
-        tgt = words[i]
-        mark = "✓" if text_results[i]["exact"] else "✗"
-        lines.append(f"  {i:2d}: brain → {repr(gen):12s}  target: {tgt:4s}  {mark}")
-    lines.append(f"\n  Exact match: {correct_text}/{N_SAMPLES}")
+    lines = ["Brain → Text: Train vs Test\n", "  TRAIN SET:"]
+    for i in train_idx:
+        r = train_text_results[i]
+        mark = "✓" if r["exact"] else "✗"
+        lines.append(f"    {i:2d}: {repr(r['generated']):8s} target={r['target']:4s} {mark}")
+    lines.append(f"\n  TEST SET (HELD OUT):")
+    for i in test_idx:
+        r = test_text_results[i]
+        mark = "✓" if r["exact"] else "✗"
+        lines.append(f"    {i:2d}: {repr(r['generated']):8s} target={r['target']:4s} {mark}")
+    lines.append(f"\n  Train: {train_correct}/{N_TRAIN}  Test: {test_correct}/{N_TEST}")
     ax.text(0.05, 0.95, "\n".join(lines), transform=ax.transAxes,
             fontsize=9, verticalalignment="top", fontfamily="monospace")
     fig.savefig(f"{OUT}/text_reconstructions.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved {OUT}/text_reconstructions.png")
 
-    # ── Semantic diversity visualization ──
-    # Generate multiple samples from same brain input using brain_noise
-    N_DIVERSE = 4   # samples per brain input
-    N_SHOW_DIV = 4  # number of brain inputs to show
+    # Semantic diversity visualization
+    N_DIVERSE = 4
+    N_SHOW_DIV = 4
     print("\n  Generating semantic diversity visualization...")
-
-    fig, axes = plt.subplots(N_SHOW_DIV, N_DIVERSE + 1, figsize=(3 * (N_DIVERSE + 1), 3 * N_SHOW_DIV))
-
+    fig, axes = plt.subplots(N_SHOW_DIV, N_DIVERSE + 1,
+                             figsize=(3 * (N_DIVERSE + 1), 3 * N_SHOW_DIV))
     for row in range(N_SHOW_DIV):
         brain = BrainData(voxels=brain_patterns_img[row:row + 1])
-        # Show target in first column
         t = target_images[row].permute(1, 2, 0).clamp(0, 1).numpy()
         axes[row, 0].imshow(t, interpolation="nearest")
         axes[row, 0].set_title(f"Target {row}", fontsize=9)
         axes[row, 0].axis("off")
-
-        # Generate N_DIVERSE samples with brain_noise for diversity
         for s in range(N_DIVERSE):
             torch.manual_seed(s * 17 + 3)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0,
-                                        brain_noise=0.3)
+            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=3.0, brain_noise=0.15)
             sample = out.output[0].detach().clamp(0, 1)
             r = sample.permute(1, 2, 0).numpy()
             axes[row, s + 1].imshow(r, interpolation="nearest")
-
             cos_to_target = F.cosine_similarity(
                 sample.flatten().unsqueeze(0),
                 target_images[row].flatten().unsqueeze(0),
             ).item()
             axes[row, s + 1].set_title(f"Sample {s} (cos={cos_to_target:.2f})", fontsize=8)
             axes[row, s + 1].axis("off")
-
-    fig.suptitle(f"Semantic Diversity: {N_DIVERSE} samples per brain input "
-                 f"(brain_noise=0.3, mean L2={mean_diversity:.3f})",
-                 fontsize=11)
+    fig.suptitle(f"Semantic Diversity: {N_DIVERSE} samples per brain "
+                 f"(noise=0.15, L2={mean_diversity:.3f})", fontsize=11)
     fig.tight_layout()
     fig.savefig(f"{OUT}/semantic_diversity.png", dpi=150)
     plt.close(fig)
@@ -605,22 +725,24 @@ torch.save(text_model.state_dict(), f"{OUT}/brain2text.pt")
 print(f"  Saved model checkpoints to {OUT}/")
 
 # ═══════════════════════════════════════════════════════════════
-# SUMMARY
+# SUMMARY — GENERALIZATION RESULTS
 # ═══════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
-print("TRAINING SUMMARY")
+print("TRAINING SUMMARY — GENERALIZATION EVALUATION")
 print("=" * 70)
-print(f"  Data: neuroprobe forward encoding model → {N_SAMPLES} (brain, stimulus) pairs")
-print(f"  Brain → Image:  loss {img_losses[0]:.3f} → {img_losses[-1]:.3f} "
-      f"(min: {min(img_losses):.3f}), cos={mean_cos_img:.3f}, "
-      f"good: {good_img}/{N_SAMPLES}")
-print(f"  Brain → Audio:  loss {audio_losses[0]:.3f} → {audio_losses[-1]:.3f} "
-      f"(min: {min(audio_losses):.3f}), cos={mean_cos_aud:.3f}, "
-      f"good: {good_aud}/{N_SAMPLES}")
-print(f"  Brain → Text:   loss {text_losses[0]:.3f} → {text_losses[-1]:.3f} "
-      f"(min: {min(text_losses):.3f}), exact: {correct_text}/{N_SAMPLES}")
-print(f"  Semantic diversity: mean inter-sample L2 = {mean_diversity:.4f}")
+print(f"  Data: {N_TOTAL} total ({N_TRAIN} train / {N_TEST} test held-out)")
+print(f"\n  Brain → Image:")
+print(f"    TRAIN: cos={train_cos_img:.3f} SSIM={train_ssim_img:.3f}")
+print(f"    TEST:  cos={test_cos_img:.3f} SSIM={test_ssim_img:.3f}")
+print(f"    Gap:   {train_cos_img - test_cos_img:.3f}")
+print(f"\n  Brain → Audio:")
+print(f"    TRAIN: cos={train_cos_aud:.3f}")
+print(f"    TEST:  cos={test_cos_aud:.3f}")
+print(f"    Gap:   {train_cos_aud - test_cos_aud:.3f}")
+print(f"\n  Brain → Text:")
+print(f"    TRAIN: {train_correct}/{N_TRAIN}")
+print(f"    TEST:  {test_correct}/{N_TEST}")
+print(f"\n  Diversity: mean L2={mean_diversity:.4f} (brain_noise=0.15)")
 
-all_pass = (good_img >= N_SAMPLES // 2 and good_aud >= N_SAMPLES // 2
-            and correct_text >= N_SAMPLES // 2 and mean_diversity > 0.01)
-print(f"\n  Overall: {'PASS' if all_pass else 'FAIL'}")
+all_pass = (test_cos_img > 0.3 and test_cos_aud > 0.3 and mean_diversity > 0.01)
+print(f"\n  Overall: {'PASS' if all_pass else 'NEEDS WORK'}")

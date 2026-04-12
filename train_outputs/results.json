@@ -1,54 +1,78 @@
 {
-  "data_source": "neuroprobe forward encoding model (stimulus -> simulated BOLD)",
-  "n_samples": 16,
+  "data_source": "neuroprobe forward encoding (stimulus -> simulated BOLD)",
+  "split": {
+    "total": 24,
+    "train": 18,
+    "test": 6
+  },
   "n_voxels": 128,
   "image": {
-    "final_loss": 0.225351,
-    "min_loss": 0.092447,
-    "initial_loss": 8.104956,
-    "mean_cosine": 0.937928,
-    "good_reconstructions": 16
+    "final_loss": 0.193099,
+    "train": {
+      "mean_cos": 0.965716,
+      "mean_ssim": 0.91016
+    },
+    "test": {
+      "mean_cos": 0.617129,
+      "mean_ssim": 0.105593
+    },
+    "generalization_gap_cos": 0.348587
   },
   "audio": {
-    "final_loss": 0.0301,
-    "min_loss": 0.011256,
-    "initial_loss": 1.180726,
-    "mean_cosine": 0.956587,
-    "good_reconstructions": 16
+    "final_loss": 0.030643,
+    "train": {
+      "mean_cos": 0.962824
+    },
+    "test": {
+      "mean_cos": 0.961552
+    },
+    "generalization_gap_cos": 0.001272
   },
   "text": {
-    "final_loss": 0.000328,
-    "min_loss": 0.000251,
-    "initial_loss": 21.851589,
-    "exact_match": 16,
+    "final_loss": 1.1e-05,
+    "train": {
+      "exact_match": 18,
+      "total": 18
+    },
+    "test": {
+      "exact_match": 0,
+      "total": 6
+    },
     "results": {
-      "fire": "fire\u0019",
-      "lake": "lakee",
-      "moon": "moona",
-      "star": "star\ufffd",
-      "wind": "winda",
-      "rain": "raina",
-      "tree": "tree\ufffd",
-      "bird": "birdi",
-      "gold": "gold*",
-      "iron": "irona",
-      "dust": "dusta",
-      "salt": "salta",
-      "bone": "bone\u0019",
-      "silk": "silk_",
-      "jade": "jade\u0019",
-      "rust": "rustt"
+      "fire": "fire",
+      "lake": "lake",
+      "moon": "moon",
+      "star": "star",
+      "wind": "wind",
+      "rain": "rain",
+      "tree": "tree",
+      "bird": "bird",
+      "gold": "gold",
+      "iron": "iron",
+      "dust": "dust",
+      "salt": "salt",
+      "bone": "bone",
+      "silk": "silk",
+      "jade": "jade",
+      "rust": "rust",
+      "dawn": "dawn",
+      "peak": "peak",
+      "wave": "jade",
+      "rose": "lire",
+      "coal": "lake",
+      "palm": "salt",
+      "cork": "iron",
+      "mint": "moon"
     }
   },
-  "semantic_diversity": {
-    "brain_noise": 0.3,
-    "num_samples": 4,
-    "mean_inter_sample_l2": 0.259781,
-    "per_input_l2": [
-      0.20639118055502573,
-      0.212392824391524,
-      0.3572541152437528,
-      0.2630854162077109
+  "diversity": {
+    "brain_noise": 0.15,
+    "mean_l2": 0.07646,
+    "per_input": [
+      0.105208,
+      0.080167,
+      0.063644,
+      0.056821
     ]
   }
 }
