@@ -448,7 +448,7 @@ if hasattr(img_model, '_brain_warmup_proj'):
 # Train flow matching — ONLY on training set
 # noise_augment=0.1 simulates fMRI measurement noise → reduces overfitting
 print(f"  Training flow matching on {N_TRAIN} training samples...")
-img_losses = train_loop(img_model, "image", n_steps=15000, lr=3e-3,
+img_losses = train_loop(img_model, "image", n_steps=20000, lr=3e-3,
                         batch_size=32,
                         cached_latents=img_latents, n_train=N_TRAIN,
                         cfg_dropout=0.0, noise_augment=0.1)

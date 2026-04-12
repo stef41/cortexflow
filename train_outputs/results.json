@@ -7,22 +7,22 @@
   },
   "n_voxels": 512,
   "image": {
-    "final_loss": 0.014864,
+    "final_loss": 0.023561,
     "train": {
-      "mean_cos": 0.997613,
-      "mean_ssim": 0.987681
+      "mean_cos": 0.997625,
+      "mean_ssim": 0.987798
     },
     "test": {
-      "mean_cos": 0.822799,
-      "mean_ssim": 0.363535
+      "mean_cos": 0.824903,
+      "mean_ssim": 0.364767
     },
-    "generalization_gap_cos": 0.174814,
+    "generalization_gap_cos": 0.172723,
     "random_baseline": {
       "cos": 0.68525,
       "ssim": 0.055577
     },
-    "test_above_baseline_cos": 0.137549,
-    "inter_output_cos": 0.739566
+    "test_above_baseline_cos": 0.139653,
+    "inter_output_cos": 0.771781
   },
   "audio": {
     "final_loss": 0.012186,
@@ -75,12 +75,12 @@
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.090064,
+    "mean_l2": 0.092171,
     "per_input": [
-      0.107877,
-      0.054602,
-      0.121956,
-      0.075821
+      0.129673,
+      0.042472,
+      0.056149,
+      0.140389
     ]
   }
 }
