@@ -47,9 +47,9 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-N_TOTAL = 120       # total (brain, stimulus) pairs
-N_TRAIN = 96        # training set
-N_TEST = 24         # held-out test set (NEVER seen during training)
+N_TOTAL = 200       # total (brain, stimulus) pairs
+N_TRAIN = 160       # training set
+N_TEST = 40         # held-out test set (NEVER seen during training)
 N_VOXELS = 512      # brain activity dimensionality
 IMG_SIZE = 32       # cortexflow output image size
 N_MELS = 8          # mel spectrogram bands (reduced to match image latent dim)
@@ -267,6 +267,16 @@ _base_words = [
     "jig", "lark", "malt", "nib", "orb", "peg", "rye", "sap",
     "tar", "urn", "vow", "web", "yam", "zest", "aloe", "chop",
     "dusk", "elk", "fox", "gum", "hut", "jab", "keg", "lid",
+    "amp", "bog", "cub", "den", "eel", "fig", "gnu", "hem",
+    "imp", "jam", "kit", "log", "map", "net", "owl", "paw",
+    "ram", "ski", "toy", "vat", "wig", "yak", "zip", "ash",
+    "bay", "cod", "dip", "eve", "fin", "gem", "hen", "inn",
+    "jot", "keg", "lug", "mop", "nap", "opt", "pal", "rum",
+    "sob", "tan", "vet", "woe", "yap", "zen", "aim", "bun",
+    "cap", "dab", "egg", "fan", "gin", "hog", "ice", "jut",
+    "kin", "lip", "mug", "nod", "oat", "pen", "rag", "sip",
+    "tap", "van", "wok", "yip", "zag", "ant", "bib", "cog",
+    "dig", "ear", "fad", "gab", "hob", "ilk", "jar", "koi",
 ]
 words = _base_words[:N_TOTAL]
 text_brains, text_tokens_list = [], []

@@ -1,86 +1,102 @@
 {
   "data_source": "neuroprobe forward encoding (stimulus -> simulated BOLD)",
   "split": {
-    "total": 120,
-    "train": 96,
-    "test": 24
+    "total": 200,
+    "train": 160,
+    "test": 40
   },
   "n_voxels": 512,
   "image": {
-    "final_loss": 0.01603,
+    "final_loss": 0.021442,
     "train": {
-      "mean_cos": 0.997639,
-      "mean_ssim": 0.987376
+      "mean_cos": 0.997541,
+      "mean_ssim": 0.9883
     },
     "test": {
-      "mean_cos": 0.870591,
-      "mean_ssim": 0.433514
+      "mean_cos": 0.780398,
+      "mean_ssim": 0.370624
     },
-    "generalization_gap_cos": 0.127048,
+    "generalization_gap_cos": 0.217143,
     "random_baseline": {
       "cos": 0.68525,
       "ssim": 0.055577
     },
-    "test_above_baseline_cos": 0.185341,
-    "inter_output_cos": 0.949054
+    "test_above_baseline_cos": 0.095148,
+    "inter_output_cos": 0.864633
   },
   "audio": {
-    "final_loss": 0.006033,
+    "final_loss": 0.015484,
     "train": {
-      "mean_cos": 0.97467
+      "mean_cos": 0.962408
     },
     "test": {
-      "mean_cos": 0.825706
+      "mean_cos": 0.860595
     },
-    "generalization_gap_cos": 0.148963,
+    "generalization_gap_cos": 0.101812,
     "random_baseline_cos": 0.543702,
-    "test_above_baseline_cos": 0.282005
+    "test_above_baseline_cos": 0.316894
   },
   "text": {
-    "final_loss": 0.001586,
+    "final_loss": 0.000993,
     "train": {
-      "exact_match": 86,
-      "total": 96
+      "exact_match": 93,
+      "total": 160
     },
     "test": {
       "exact_match": 0,
-      "total": 24
+      "total": 40
     },
     "results": {
-      "jig": "twig",
-      "lark": "haze",
-      "malt": "palm",
-      "nib": "iron",
-      "orb": "rose",
-      "peg": "lime",
-      "rye": "fern",
-      "sap": "salt",
-      "tar": "bark",
-      "urn": "urne",
-      "vow": "cove",
-      "web": "ewed",
-      "yam": "gapp",
-      "zest": "satk",
-      "aloe": "vale",
-      "chop": "ooch",
-      "dusk": "dost",
-      "elk": "kelp",
-      "fox": "echo",
-      "gum": "tree",
-      "hut": "dust",
-      "jab": "baze",
-      "keg": "kite",
-      "lid": "jide"
+      "sob": "snow",
+      "tan": "nain",
+      "vet": "tine",
+      "woe": "ewew",
+      "yap": "pape",
+      "zen": "gape",
+      "aim": "jamm",
+      "bun": "unnx",
+      "cap": "cape",
+      "dab": "c\ufffdrk",
+      "egg": "kege",
+      "fan": "fawn",
+      "gin": "gnit",
+      "hog": "gold",
+      "ice": "jige",
+      "jut": "gusk",
+      "kin": "kitk",
+      "lip": "glom",
+      "mug": "gumm",
+      "nod": "nond",
+      "oat": "snow",
+      "pen": "pene",
+      "rag": "rain",
+      "sip": "mist",
+      "tap": "pape",
+      "van": "vain",
+      "wok": "dock",
+      "yip": "pipp",
+      "zag": "jazz",
+      "ant": "nain",
+      "bib": "bine",
+      "cog": "bogo",
+      "dig": "tide",
+      "ear": "arch",
+      "fad": "faCn",
+      "gab": "bass",
+      "hob": "chop",
+      "ilk": "jige",
+      "jar": "jaze",
+      "koi": "kkkk"
     }
   },
   "diversity": {
     "brain_noise": 0.15,
-    "mean_l2": 0.060426,
+    "mean_l2": 0.096538,
     "per_input": [
-      0.064248,
-      0.04939,
-      0.020659,
-      0.107407
+      0.099318,
+      0.061075,
+      0.172354,
+      0.053407
     ]
   }
 }
