@@ -1,15 +1,22 @@
-"""Training demo: train brain→image/audio/text models until they converge.
+"""Training demo: train cortexflow decoders using neuroprobe's forward model.
 
-This demonstrates that cortexflow models can actually learn the
-brain → stimulus mapping. Uses structured synthetic data where each
-brain pattern maps to a distinct stimulus.
+Uses neuroprobe's brain encoding model (stimulus → predicted BOLD) to
+generate realistic (brain_activity, stimulus) pairs, then trains
+cortexflow's brain→image/audio/text pipelines on this data.
 
-Results are saved to train_outputs/ with loss curves and reconstructions.
+This simulates the actual neuroscience workflow:
+  1. Subject sees/hears a stimulus
+  2. fMRI records brain activity (simulated by neuroprobe's forward model)
+  3. Decoder reconstructs the stimulus from brain activity (cortexflow)
+
+Results saved to train_outputs/ with loss curves and reconstruction PNGs.
 """
 
 import os
 import time
+import json
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -21,91 +28,130 @@ from cortexflow import (
     Brain2Text,
 )
 
+# neuroprobe provides the forward encoding model (stimulus → brain)
+from neuroprobe.media import (
+    build_brain_model,
+    synthesize_video,
+    synthesize_audio,
+)
+
 OUT = "train_outputs"
 os.makedirs(OUT, exist_ok=True)
 
 torch.manual_seed(42)
 
 # ═══════════════════════════════════════════════════════════════
-# STRUCTURED SYNTHETIC DATA
+# CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-# 8 distinct brain patterns → 8 distinct stimuli
-# Each brain pattern is a unique random vector; each stimulus is
-# a structured (not random) target that the model should learn to
-# reconstruct from the corresponding brain input.
+N_SAMPLES = 16      # number of (brain, stimulus) pairs per modality
+N_VOXELS = 128      # brain activity dimensionality
+IMG_SIZE = 8        # cortexflow output image size
+N_MELS = 16         # mel spectrogram bands
+AUDIO_LEN = 16      # mel spectrogram time steps
 
-N_PATTERNS = 8
-N_VOXELS = 64
-IMG_SIZE = 8
+# ═══════════════════════════════════════════════════════════════
+# GENERATE DATA VIA NEUROPROBE FORWARD MODEL
+# ═══════════════════════════════════════════════════════════════
+print("=" * 70)
+print("GENERATING DATA VIA NEUROPROBE FORWARD ENCODER")
+print("=" * 70)
 
-# Fixed brain patterns (the "subjects watching different stimuli")
-brain_patterns = torch.randn(N_PATTERNS, N_VOXELS)
-# Normalize to unit norm for stability
-brain_patterns = F.normalize(brain_patterns, dim=1) * 3.0
+# Build forward brain encoding models: stimulus → predicted BOLD activity
+# This simulates how the brain responds to visual/auditory stimuli
+vision_forward = build_brain_model(
+    modality="video", feature_dim=256, n_vertices=N_VOXELS,
+    hidden_dim=128, seed=42,
+)
+audio_forward = build_brain_model(
+    modality="audio", feature_dim=256, n_vertices=N_VOXELS,
+    hidden_dim=128, seed=77,
+)
+text_forward = build_brain_model(
+    modality="text", feature_dim=256, n_vertices=N_VOXELS,
+    hidden_dim=128, seed=99, vocab_size=256,  # byte-level
+)
 
-# Fixed target images: each is a distinct color/pattern
-target_images = torch.zeros(N_PATTERNS, 3, IMG_SIZE, IMG_SIZE)
-colors = [
-    (1.0, 0.0, 0.0),  # red
-    (0.0, 1.0, 0.0),  # green
-    (0.0, 0.0, 1.0),  # blue
-    (1.0, 1.0, 0.0),  # yellow
-    (1.0, 0.0, 1.0),  # magenta
-    (0.0, 1.0, 1.0),  # cyan
-    (1.0, 1.0, 1.0),  # white
-    (0.0, 0.0, 0.0),  # black
-]
-for i, (r, g, b) in enumerate(colors):
-    target_images[i, 0] = r
-    target_images[i, 1] = g
-    target_images[i, 2] = b
-    # Add spatial pattern: darken quadrant based on index
-    qi = i % 4
-    row = (qi // 2) * (IMG_SIZE // 2)
-    col = (qi % 2) * (IMG_SIZE // 2)
-    target_images[i, :, row:row + IMG_SIZE // 2, col:col + IMG_SIZE // 2] *= 0.4
+print(f"  Forward models: stimulus → {N_VOXELS}-dim brain activity")
 
-# Fixed target audio: each is a distinct frequency sine on a mel-like grid
-N_MELS = 16
-AUDIO_LEN = 16
-target_mels = torch.zeros(N_PATTERNS, N_MELS, AUDIO_LEN)
-for i in range(N_PATTERNS):
-    # Each pattern activates a different mel band
-    band = (i * N_MELS) // N_PATTERNS
-    width = max(1, N_MELS // N_PATTERNS)
-    target_mels[i, band:band + width, :] = 1.0
-    # Add temporal pattern: energy in a specific time window
-    t_start = (i * AUDIO_LEN) // N_PATTERNS
-    t_width = max(1, AUDIO_LEN // N_PATTERNS)
-    target_mels[i, :, t_start:t_start + t_width] += 0.5
+# --- Image data: synthesize videos, take single frame as target ---
+print(f"\n  Generating {N_SAMPLES} image stimuli via synthesize_video...")
+image_brains, image_targets = [], []
+for i in range(N_SAMPLES):
+    video = synthesize_video(n_frames=1, height=IMG_SIZE, width=IMG_SIZE,
+                             seed=i * 13 + 7)  # distinct scenes
+    with torch.no_grad():
+        bold = vision_forward.predict(video)    # (1, V)
+        brain_vec = bold.mean(dim=0)            # (V,)
+    image_brains.append(brain_vec)
+    image_targets.append(video[0])              # single frame (3, H, W)
 
-# Fixed target texts: each is a distinct 4-letter word
-words = ["fire", "lake", "moon", "star", "wind", "rain", "tree", "bird"]
-target_tokens = torch.zeros(N_PATTERNS, 8, dtype=torch.long)
-for i, w in enumerate(words):
-    t = Brain2Text.text_to_tokens(w)
-    target_tokens[i, :len(t)] = t
+brain_patterns_img = torch.stack(image_brains)  # (N, V)
+target_images = torch.stack(image_targets)      # (N, 3, H, W)
+print(f"  Brain: {brain_patterns_img.shape}, range "
+      f"[{brain_patterns_img.min():.2f}, {brain_patterns_img.max():.2f}]")
+print(f"  Images: {target_images.shape}")
+
+# --- Audio data: synthesize waveforms → mel-like target ---
+print(f"\n  Generating {N_SAMPLES} audio stimuli via synthesize_audio...")
+audio_brains, audio_targets = [], []
+for i in range(N_SAMPLES):
+    wav = synthesize_audio(duration=0.1, sample_rate=4000, seed=i * 17 + 3)
+    with torch.no_grad():
+        bold = audio_forward.predict(wav)       # (T, V)
+        brain_vec = bold.mean(dim=0)            # (V,)
+    # Build a mel-like target from the waveform via short-time FFT
+    n_fft = N_MELS * 2
+    hop = max(1, wav.shape[0] // AUDIO_LEN)
+    padded = F.pad(wav, (0, n_fft))
+    frames = padded.unfold(0, n_fft, hop)[:AUDIO_LEN]
+    if frames.shape[0] < AUDIO_LEN:
+        frames = F.pad(frames, (0, 0, 0, AUDIO_LEN - frames.shape[0]))
+    spec = torch.fft.rfft(frames, dim=-1).abs()[:, :N_MELS]  # (T, M)
+    mel = spec.T / spec.max().clamp(min=1e-6)                 # (M, T) in [0,1]
+    audio_brains.append(brain_vec)
+    audio_targets.append(mel)
+
+brain_patterns_aud = torch.stack(audio_brains)
+target_mels = torch.stack(audio_targets)
+print(f"  Brain: {brain_patterns_aud.shape}")
+print(f"  Mels: {target_mels.shape}")
+
+# --- Text data: words → forward model → brain patterns ---
+print(f"\n  Generating {N_SAMPLES} text stimuli...")
+words = ["fire", "lake", "moon", "star", "wind", "rain", "tree", "bird",
+         "gold", "iron", "dust", "salt", "bone", "silk", "jade", "rust"]
+words = words[:N_SAMPLES]
+text_brains, text_tokens_list = [], []
+for i, word in enumerate(words):
+    tokens = Brain2Text.text_to_tokens(word)
+    token_t = torch.tensor(tokens, dtype=torch.long).clamp(max=255)
+    with torch.no_grad():
+        bold = text_forward.predict(token_t)    # (L, V)
+        brain_vec = bold.mean(dim=0)            # (V,)
+    padded = torch.zeros(8, dtype=torch.long)
+    padded[:len(tokens)] = torch.tensor(tokens)
+    text_brains.append(brain_vec)
+    text_tokens_list.append(padded)
+
+brain_patterns_txt = torch.stack(text_brains)
+target_tokens = torch.stack(text_tokens_list)
+print(f"  Brain: {brain_patterns_txt.shape}")
+print(f"  Words: {words}")
 
 
 def make_batch(indices, modality="image"):
     """Create a training batch from pattern indices."""
-    brains = BrainData(voxels=brain_patterns[indices])
     if modality == "image":
-        return brains, target_images[indices]
+        return BrainData(voxels=brain_patterns_img[indices]), target_images[indices]
     elif modality == "audio":
-        return brains, target_mels[indices]
+        return BrainData(voxels=brain_patterns_aud[indices]), target_mels[indices]
     elif modality == "text":
-        return brains, target_tokens[indices]
+        return BrainData(voxels=brain_patterns_txt[indices]), target_tokens[indices]
 
 
 def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
                cached_latents=None):
-    """Generic training loop with progress reporting.
-    
-    For image/audio modalities using flow matching, pass cached_latents
-    to avoid re-encoding targets every step (huge CPU speedup).
-    """
-    # When using cached latents, only train DiT + brain encoder (not VAE)
+    """Training loop. cached_latents skips VAE encode (huge CPU speedup)."""
     if cached_latents is not None:
         params = [p for n, p in model.named_parameters()
                   if not n.startswith("vae.")]
@@ -118,8 +164,7 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
     t0 = time.time()
 
     for step in range(n_steps):
-        # Sample random patterns
-        idx = torch.randint(0, N_PATTERNS, (batch_size,))
+        idx = torch.randint(0, N_SAMPLES, (batch_size,))
         brain, target = make_batch(idx, modality)
 
         if cached_latents is not None and modality in ("image", "audio"):
@@ -153,7 +198,7 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → IMAGE
 # ═══════════════════════════════════════════════════════════════
-print("=" * 70)
+print("\n" + "=" * 70)
 print("TRAINING BRAIN → IMAGE")
 print("=" * 70)
 
@@ -162,13 +207,12 @@ img_model = build_brain2img(
     hidden_dim=32, depth=2, num_heads=4,
 )
 
-# Step 1: Pre-train the VAE to encode/decode our target images faithfully
+# Pre-train VAE on target images
 print("  Pre-training VAE on target images...")
 vae_opt = torch.optim.Adam(img_model.vae.parameters(), lr=1e-3)
 img_model.vae.train()
 t0 = time.time()
 for step in range(300):
-    # Always train on all 8 target images (small enough to fit in one batch)
     recon, mu, logvar = img_model.vae(target_images)
     loss, info = img_model.vae.loss(target_images, recon, mu, logvar)
     vae_opt.zero_grad()
@@ -178,55 +222,41 @@ for step in range(300):
         print(f"    VAE step {step}: recon={info['recon']:.6f} kl={info['kl']:.4f} ({time.time()-t0:.0f}s)")
 img_model.vae.eval()
 
-# Verify VAE reconstruction quality
 with torch.no_grad():
     vae_recon, _, _ = img_model.vae(target_images)
     vae_err = (target_images - vae_recon).pow(2).mean().sqrt().item()
     print(f"  VAE reconstruction error: {vae_err:.4f}")
 
-# Step 2: Pre-encode to latents for fast flow matching training
+# Cache latents for fast training
 print("  Encoding target images to VAE latents...")
 with torch.no_grad():
     img_latents, _, _ = img_model.vae.encode(target_images)
 print(f"  Latent shape: {img_latents.shape}")
 
-# Step 3: Train the flow matching (DiT + BrainEncoder) with cached latents
+# Train flow matching
 print("  Training flow matching (DiT + BrainEncoder)...")
 img_losses = train_loop(img_model, "image", n_steps=2000, lr=3e-3, cached_latents=img_latents)
 
-# Evaluate: reconstruct each pattern
+# Evaluate
 img_model.eval()
 print("\n  Reconstruction evaluation:")
 img_results = {}
-for i in range(N_PATTERNS):
-    brain = BrainData(voxels=brain_patterns[i:i + 1])
+for i in range(N_SAMPLES):
+    brain = BrainData(voxels=brain_patterns_img[i:i + 1])
     torch.manual_seed(0)
     out = img_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
-    # Compare dominant color channel
-    out_rgb = out.output[0].mean(dim=(1, 2))  # (3,)
-    tgt_rgb = target_images[i].mean(dim=(1, 2))
     l2 = (out.output - target_images[i:i + 1]).pow(2).mean().sqrt().item()
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
         target_images[i:i + 1].flatten().unsqueeze(0),
     ).item()
-    ch_names = ["R", "G", "B"]
-    dom_out = ch_names[out_rgb.argmax().item()]
-    dom_tgt = ch_names[tgt_rgb.argmax().item()]
-    # For black (all zeros), mark as special
-    if tgt_rgb.max() < 0.01:
-        dom_tgt = "K"  # black
-        dom_out = "K" if out_rgb.max() < 0.2 else dom_out
-    img_results[i] = {"l2": l2, "cos": cos, "dom_out": dom_out, "dom_tgt": dom_tgt}
-    match = "✓" if dom_out == dom_tgt else "✗"
-    color = colors[i]
-    print(f"  Pattern {i} ({words[i]:4s}, color={color}): "
-          f"L2={l2:.3f} cos={cos:.3f} dom={dom_out}(expect {dom_tgt}) {match}")
+    img_results[i] = {"l2": l2, "cos": cos}
+    quality = "✓" if cos > 0.7 else ("~" if cos > 0.3 else "✗")
+    print(f"  Sample {i:2d}: L2={l2:.3f} cos={cos:.3f} {quality}")
 
-correct = sum(1 for r in img_results.values() if r["dom_out"] == r["dom_tgt"])
-mean_cos = sum(r["cos"] for r in img_results.values()) / N_PATTERNS
-print(f"\n  Dominant channel correct: {correct}/{N_PATTERNS}")
-print(f"  Mean cosine similarity: {mean_cos:.3f}")
+mean_cos_img = sum(r["cos"] for r in img_results.values()) / N_SAMPLES
+good_img = sum(1 for r in img_results.values() if r["cos"] > 0.5)
+print(f"\n  Mean cosine: {mean_cos_img:.3f}, Good (cos>0.5): {good_img}/{N_SAMPLES}")
 
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → AUDIO
@@ -241,34 +271,25 @@ audio_model = build_brain2audio(
 )
 audio_losses = train_loop(audio_model, "audio", n_steps=2000, lr=3e-3)
 
-# Evaluate
 audio_model.eval()
 print("\n  Reconstruction evaluation:")
 audio_results = {}
-for i in range(N_PATTERNS):
-    brain = BrainData(voxels=brain_patterns[i:i + 1])
+for i in range(N_SAMPLES):
+    brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
     torch.manual_seed(0)
     out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
-    # Check which mel band is most active
-    mel_energy = out.output[0].mean(dim=-1)  # (n_mels,)
-    peak_band = mel_energy.argmax().item()
-    expected_band = (i * N_MELS) // N_PATTERNS
     l2 = (out.output - target_mels[i:i + 1]).pow(2).mean().sqrt().item()
     cos = F.cosine_similarity(
         out.output.flatten().unsqueeze(0),
         target_mels[i:i + 1].flatten().unsqueeze(0),
     ).item()
-    near = abs(peak_band - expected_band) <= 4
-    audio_results[i] = {"l2": l2, "cos": cos, "peak": peak_band, "expected": expected_band}
-    match = "✓" if near else "✗"
-    print(f"  Pattern {i} ({words[i]:4s}): L2={l2:.3f} cos={cos:.3f} "
-          f"peak_band={peak_band} (expect ~{expected_band}) {match}")
+    audio_results[i] = {"l2": l2, "cos": cos}
+    quality = "✓" if cos > 0.7 else ("~" if cos > 0.3 else "✗")
+    print(f"  Sample {i:2d}: L2={l2:.3f} cos={cos:.3f} {quality}")
 
-correct_audio = sum(1 for r in audio_results.values()
-                    if abs(r["peak"] - r["expected"]) <= 4)
-mean_cos_audio = sum(r["cos"] for r in audio_results.values()) / N_PATTERNS
-print(f"\n  Peak band correct (±4): {correct_audio}/{N_PATTERNS}")
-print(f"  Mean cosine similarity: {mean_cos_audio:.3f}")
+mean_cos_aud = sum(r["cos"] for r in audio_results.values()) / N_SAMPLES
+good_aud = sum(1 for r in audio_results.values() if r["cos"] > 0.5)
+print(f"\n  Mean cosine: {mean_cos_aud:.3f}, Good (cos>0.5): {good_aud}/{N_SAMPLES}")
 
 # ═══════════════════════════════════════════════════════════════
 # TRAIN BRAIN → TEXT
@@ -282,22 +303,20 @@ text_model = build_brain2text(
 )
 text_losses = train_loop(text_model, "text", n_steps=500, lr=3e-3)
 
-# Evaluate
 text_model.eval()
 print("\n  Reconstruction evaluation:")
 text_results = {}
-for i in range(N_PATTERNS):
-    brain = BrainData(voxels=brain_patterns[i:i + 1])
+for i in range(N_SAMPLES):
+    brain = BrainData(voxels=brain_patterns_txt[i:i + 1])
     out = text_model.reconstruct(brain, max_len=6, temperature=0.3)
     generated = out.metadata["texts"][0]
-    exact = generated.strip()[:4] == words[i]
-    prefix = generated.strip()[:2] == words[i][:2]
+    exact = generated.strip()[:4] == words[i][:4]
     text_results[i] = {"generated": generated, "target": words[i], "exact": exact}
-    match = "✓" if exact else ("~" if prefix else "✗")
-    print(f"  Pattern {i}: brain → {repr(generated):12s} (target: {words[i]:4s}) {match}")
+    match = "✓" if exact else "✗"
+    print(f"  Sample {i:2d}: brain → {repr(generated):12s} (target: {words[i]:4s}) {match}")
 
 correct_text = sum(1 for r in text_results.values() if r["exact"])
-print(f"\n  Exact match (first 4 chars): {correct_text}/{N_PATTERNS}")
+print(f"\n  Exact match (first 4 chars): {correct_text}/{N_SAMPLES}")
 
 # ═══════════════════════════════════════════════════════════════
 # SAVE RESULTS
@@ -309,32 +328,37 @@ print("=" * 70)
 import json
 
 results = {
+    "data_source": "neuroprobe forward encoding model (stimulus -> simulated BOLD)",
+    "n_samples": N_SAMPLES,
+    "n_voxels": N_VOXELS,
     "image": {
         "final_loss": img_losses[-1],
         "min_loss": min(img_losses),
         "initial_loss": img_losses[0],
-        "dominant_channel_correct": correct,
-        "mean_cosine": mean_cos,
+        "mean_cosine": mean_cos_img,
+        "good_reconstructions": good_img,
     },
     "audio": {
         "final_loss": audio_losses[-1],
         "min_loss": min(audio_losses),
         "initial_loss": audio_losses[0],
-        "peak_band_correct": correct_audio,
-        "mean_cosine": mean_cos_audio,
+        "mean_cosine": mean_cos_aud,
+        "good_reconstructions": good_aud,
     },
     "text": {
         "final_loss": text_losses[-1],
         "min_loss": min(text_losses),
         "initial_loss": text_losses[0],
         "exact_match": correct_text,
-        "results": {words[i]: text_results[i]["generated"] for i in range(N_PATTERNS)},
+        "results": {words[i]: text_results[i]["generated"] for i in range(N_SAMPLES)},
     },
 }
 
 with open(f"{OUT}/results.json", "w") as f:
-    json.dump({k: {kk: round(vv, 6) if isinstance(vv, float) else vv
-                    for kk, vv in v.items()} for k, v in results.items()}, f, indent=2)
+    json.dump({k: (round(v, 6) if isinstance(v, float) else
+                    {kk: round(vv, 6) if isinstance(vv, float) else vv
+                     for kk, vv in v.items()} if isinstance(v, dict) else v)
+                for k, v in results.items()}, f, indent=2)
 
 # Save loss curves as PNG
 try:
@@ -357,22 +381,21 @@ try:
         ax.set_xlabel("Step")
         ax.set_ylabel("Loss")
         ax.grid(True, alpha=0.3)
-    fig.suptitle("Training Loss Curves (smoothed)", fontsize=13)
+    fig.suptitle("Training Loss Curves — neuroprobe forward model data", fontsize=13)
     fig.tight_layout()
     fig.savefig(f"{OUT}/loss_curves.png", dpi=150)
     plt.close(fig)
     print(f"  Saved {OUT}/loss_curves.png")
 
     # Save image reconstructions grid
-    fig, axes = plt.subplots(2, N_PATTERNS, figsize=(2.5 * N_PATTERNS, 5))
-    for i in range(N_PATTERNS):
-        # Top row: target
-        t = target_images[i].permute(1, 2, 0).numpy()
+    n_show = min(8, N_SAMPLES)
+    fig, axes = plt.subplots(2, n_show, figsize=(2.5 * n_show, 5))
+    for i in range(n_show):
+        t = target_images[i].permute(1, 2, 0).clamp(0, 1).numpy()
         axes[0, i].imshow(t)
-        axes[0, i].set_title(f"Target ({words[i]})", fontsize=8)
+        axes[0, i].set_title(f"Target {i}", fontsize=8)
         axes[0, i].axis("off")
-        # Bottom row: reconstruction
-        brain = BrainData(voxels=brain_patterns[i:i + 1])
+        brain = BrainData(voxels=brain_patterns_img[i:i + 1])
         torch.manual_seed(0)
         out = img_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
         r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
@@ -380,41 +403,41 @@ try:
         cos = img_results[i]["cos"]
         axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)
         axes[1, i].axis("off")
-    fig.suptitle("Brain → Image: Target vs Reconstruction", fontsize=12)
+    fig.suptitle("Brain → Image: Target vs Reconstruction (neuroprobe data)", fontsize=12)
     fig.tight_layout()
     fig.savefig(f"{OUT}/image_reconstructions.png", dpi=150)
     plt.close(fig)
     print(f"  Saved {OUT}/image_reconstructions.png")
 
     # Save audio reconstructions
-    fig, axes = plt.subplots(2, N_PATTERNS, figsize=(2.5 * N_PATTERNS, 5))
-    for i in range(N_PATTERNS):
+    fig, axes = plt.subplots(2, n_show, figsize=(2.5 * n_show, 5))
+    for i in range(n_show):
         axes[0, i].imshow(target_mels[i].numpy(), aspect="auto", origin="lower")
-        axes[0, i].set_title(f"Target ({words[i]})", fontsize=8)
+        axes[0, i].set_title(f"Target {i}", fontsize=8)
         axes[0, i].axis("off")
-        brain = BrainData(voxels=brain_patterns[i:i + 1])
+        brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
         out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=3.0)
         axes[1, i].imshow(out.output[0].detach().numpy(), aspect="auto", origin="lower")
         cos = audio_results[i]["cos"]
         axes[1, i].set_title(f"Recon (cos={cos:.2f})", fontsize=8)
         axes[1, i].axis("off")
-    fig.suptitle("Brain → Audio (Mel): Target vs Reconstruction", fontsize=12)
+    fig.suptitle("Brain → Audio (Mel): Target vs Reconstruction (neuroprobe data)", fontsize=12)
     fig.tight_layout()
     fig.savefig(f"{OUT}/audio_reconstructions.png", dpi=150)
     plt.close(fig)
     print(f"  Saved {OUT}/audio_reconstructions.png")
 
     # Text results figure
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(6, 5))
     ax.axis("off")
-    lines = ["Brain → Text: Reconstruction Results\n"]
-    for i in range(N_PATTERNS):
+    lines = ["Brain → Text: Reconstruction Results (neuroprobe data)\n"]
+    for i in range(N_SAMPLES):
         gen = text_results[i]["generated"]
         tgt = words[i]
         mark = "✓" if text_results[i]["exact"] else "✗"
-        lines.append(f"  Pattern {i}: brain → {repr(gen):12s}  target: {tgt:4s}  {mark}")
-    lines.append(f"\n  Exact match: {correct_text}/{N_PATTERNS}")
+        lines.append(f"  {i:2d}: brain → {repr(gen):12s}  target: {tgt:4s}  {mark}")
+    lines.append(f"\n  Exact match: {correct_text}/{N_SAMPLES}")
     ax.text(0.05, 0.95, "\n".join(lines), transform=ax.transAxes,
             fontsize=9, verticalalignment="top", fontfamily="monospace")
     fig.savefig(f"{OUT}/text_reconstructions.png", dpi=150, bbox_inches="tight")
@@ -436,15 +459,16 @@ print(f"  Saved model checkpoints to {OUT}/")
 print("\n" + "=" * 70)
 print("TRAINING SUMMARY")
 print("=" * 70)
+print(f"  Data: neuroprobe forward encoding model → {N_SAMPLES} (brain, stimulus) pairs")
 print(f"  Brain → Image:  loss {img_losses[0]:.3f} → {img_losses[-1]:.3f} "
-      f"(min: {min(img_losses):.3f}), {correct}/{N_PATTERNS} dominant channel correct, "
-      f"cos={mean_cos:.3f}")
+      f"(min: {min(img_losses):.3f}), cos={mean_cos_img:.3f}, "
+      f"good: {good_img}/{N_SAMPLES}")
 print(f"  Brain → Audio:  loss {audio_losses[0]:.3f} → {audio_losses[-1]:.3f} "
-      f"(min: {min(audio_losses):.3f}), {correct_audio}/{N_PATTERNS} peak band correct, "
-      f"cos={mean_cos_audio:.3f}")
+      f"(min: {min(audio_losses):.3f}), cos={mean_cos_aud:.3f}, "
+      f"good: {good_aud}/{N_SAMPLES}")
 print(f"  Brain → Text:   loss {text_losses[0]:.3f} → {text_losses[-1]:.3f} "
-      f"(min: {min(text_losses):.3f}), {correct_text}/{N_PATTERNS} exact match")
+      f"(min: {min(text_losses):.3f}), exact: {correct_text}/{N_SAMPLES}")
 
-all_pass = correct >= N_PATTERNS // 2 and correct_audio >= N_PATTERNS // 2 and correct_text >= N_PATTERNS // 2
-print(f"\n  Overall: {'PASS' if all_pass else 'FAIL'} "
-      f"(need ≥{N_PATTERNS // 2}/{N_PATTERNS} correct per modality)")
+all_pass = (good_img >= N_SAMPLES // 2 and good_aud >= N_SAMPLES // 2
+            and correct_text >= N_SAMPLES // 2)
+print(f"\n  Overall: {'PASS' if all_pass else 'FAIL'}")

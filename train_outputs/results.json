@@ -1,32 +1,43 @@
 {
+  "data_source": "neuroprobe forward encoding model (stimulus -> simulated BOLD)",
+  "n_samples": 16,
+  "n_voxels": 128,
   "image": {
-    "final_loss": 0.093659,
-    "min_loss": 0.032225,
-    "initial_loss": 7.644078,
-    "dominant_channel_correct": 6,
-    "mean_cosine": 0.864209
+    "final_loss": 0.233628,
+    "min_loss": 0.096579,
+    "initial_loss": 4.003617,
+    "mean_cosine": 0.942174,
+    "good_reconstructions": 16
   },
   "audio": {
-    "final_loss": 0.04196,
-    "min_loss": 0.020048,
-    "initial_loss": 1.230529,
-    "peak_band_correct": 8,
-    "mean_cosine": 0.860047
+    "final_loss": 0.038569,
+    "min_loss": 0.0156,
+    "initial_loss": 1.168745,
+    "mean_cosine": 0.955563,
+    "good_reconstructions": 16
   },
   "text": {
-    "final_loss": 0.000204,
-    "min_loss": 7.2e-05,
-    "initial_loss": 19.699347,
-    "exact_match": 8,
+    "final_loss": 0.000363,
+    "min_loss": 0.000223,
+    "initial_loss": 21.851589,
+    "exact_match": 16,
     "results": {
-      "fire": "firee",
+      "fire": "fire\u0019",
       "lake": "lakee",
-      "moon": "moonn",
-      "star": "stare",
-      "wind": "windd",
-      "rain": "rainn",
-      "tree": "treet",
-      "bird": "birdd"
+      "moon": "moona",
+      "star": "star\ufffd",
+      "wind": "winda",
+      "rain": "rain\ufffd",
+      "tree": "tree\ufffd",
+      "bird": "birdi",
+      "gold": "gold*",
+      "iron": "irona",
+      "dust": "dusta",
+      "salt": "salta",
+      "bone": "bone\u0019",
+      "silk": "silks",
+      "jade": "jade\u0019",
+      "rust": "rustt"
     }
   }
 }
