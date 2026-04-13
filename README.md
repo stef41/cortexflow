@@ -237,6 +237,28 @@ Simple patterns (splits) are near-perfectly reconstructed. Complex local feature
 
 ![Representation Analysis](train_outputs/representation_analysis.png)
 
+### Noise Robustness
+
+fMRI is inherently noisy. How does reconstruction quality degrade as brain signal noise increases? We train on clean data and evaluate with Gaussian noise added to brain patterns (0–100% of signal std):
+
+| Noise | DiT cos | SSIM | Linear cos | Gap |
+|-------|---------|------|------------|-----|
+| 0.0 | 0.865 | 0.516 | 0.872 | -0.007 |
+| 0.1 | 0.863 | 0.498 | 0.868 | -0.005 |
+| 0.2 | 0.850 | 0.440 | 0.853 | -0.003 |
+| 0.3 | 0.836 | 0.374 | 0.837 | -0.001 |
+| 0.5 | 0.810 | 0.275 | 0.810 | +0.001 |
+| 0.7 | 0.792 | 0.216 | 0.791 | +0.002 |
+| 1.0 | 0.775 | 0.164 | 0.774 | +0.001 |
+
+Key findings:
+- Both methods degrade gracefully — even at 1.0× noise, cos remains well above random (0.685)
+- **DiT is slightly more noise-robust**: drops 0.090 cos vs linear's 0.098 (8% less sensitive)
+- The gap **reverses at high noise** — DiT slightly outperforms linear at noise ≥ 0.5×
+- The brain encoder's noise augmentation during training provides implicit regularization
+
+![Noise Robustness](train_outputs/noise_robustness.png)
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?

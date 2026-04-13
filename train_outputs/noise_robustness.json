@@ -1,0 +1,90 @@
+{
+  "brain_std": 0.34096217155456543,
+  "baseline_cos": 0.6852497723541762,
+  "results": [
+    {
+      "noise_level": 0.0,
+      "noise_std_abs": 0.0,
+      "dit_cos": 0.8652,
+      "dit_ssim": 0.5164,
+      "linear_cos": 0.8722,
+      "linear_ssim": 0.5075,
+      "gap_cos": -0.0071,
+      "gap_ssim": 0.0089,
+      "paired_t": -0.925,
+      "time_s": 34
+    },
+    {
+      "noise_level": 0.1,
+      "noise_std_abs": 0.0341,
+      "dit_cos": 0.8629,
+      "dit_ssim": 0.4978,
+      "linear_cos": 0.8676,
+      "linear_ssim": 0.4786,
+      "gap_cos": -0.0047,
+      "gap_ssim": 0.0192,
+      "paired_t": -0.64,
+      "time_s": 36
+    },
+    {
+      "noise_level": 0.2,
+      "noise_std_abs": 0.0682,
+      "dit_cos": 0.8504,
+      "dit_ssim": 0.4402,
+      "linear_cos": 0.8533,
+      "linear_ssim": 0.4131,
+      "gap_cos": -0.0029,
+      "gap_ssim": 0.0272,
+      "paired_t": -0.392,
+      "time_s": 37
+    },
+    {
+      "noise_level": 0.3,
+      "noise_std_abs": 0.1023,
+      "dit_cos": 0.8357,
+      "dit_ssim": 0.3744,
+      "linear_cos": 0.837,
+      "linear_ssim": 0.3484,
+      "gap_cos": -0.0013,
+      "gap_ssim": 0.026,
+      "paired_t": -0.19,
+      "time_s": 37
+    },
+    {
+      "noise_level": 0.5,
+      "noise_std_abs": 0.1705,
+      "dit_cos": 0.8104,
+      "dit_ssim": 0.2753,
+      "linear_cos": 0.8099,
+      "linear_ssim": 0.2558,
+      "gap_cos": 0.0005,
+      "gap_ssim": 0.0195,
+      "paired_t": 0.089,
+      "time_s": 36
+    },
+    {
+      "noise_level": 0.7,
+      "noise_std_abs": 0.2387,
+      "dit_cos": 0.7925,
+      "dit_ssim": 0.2157,
+      "linear_cos": 0.7909,
+      "linear_ssim": 0.2018,
+      "gap_cos": 0.0016,
+      "gap_ssim": 0.0138,
+      "paired_t": 0.385,
+      "time_s": 35
+    },
+    {
+      "noise_level": 1.0,
+      "noise_std_abs": 0.341,
+      "dit_cos": 0.7747,
+      "dit_ssim": 0.164,
+      "linear_cos": 0.7741,
+      "linear_ssim": 0.1588,
+      "gap_cos": 0.0006,
+      "gap_ssim": 0.0052,
+      "paired_t": 0.224,
+      "time_s": 35
+    }
+  ]
+}
