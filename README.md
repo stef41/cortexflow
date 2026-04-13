@@ -147,8 +147,8 @@ ema.restore(model, originals)
 
 | Modality | Test cos | SSIM | Above random | vs Linear | Diverse? |
 |----------|----------|------|--------------|-----------|----------|
-| Image    | 0.858    | 0.503 | +0.173      | -0.005    | ✓ (0.888) |
-| Audio    | 0.893    | —    | +0.349       | -0.014    | ✓ (0.727) |
+| Image    | 0.871    | 0.535 | +0.186      | -0.003    | ✓ (0.889) |
+| Audio    | 0.893    | —    | +0.349       | -0.016    | ✓ (0.727) |
 | Text     | 0/100    | —    | expected     | —         | —        |
 
 **Image reconstructions** (top: train, bottom: held-out test):
