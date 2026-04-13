@@ -1,0 +1,59 @@
+{
+  "results": [
+    {
+      "n_train": 50,
+      "test_cos": 0.811,
+      "test_ssim": 0.265,
+      "linear_cos": 0.812,
+      "gap": -0.001,
+      "above_random": 0.126,
+      "time_s": 651
+    },
+    {
+      "n_train": 100,
+      "test_cos": 0.82,
+      "test_ssim": 0.345,
+      "linear_cos": 0.82,
+      "gap": 0.001,
+      "above_random": 0.135,
+      "time_s": 570
+    },
+    {
+      "n_train": 150,
+      "test_cos": 0.853,
+      "test_ssim": 0.452,
+      "linear_cos": 0.863,
+      "gap": -0.011,
+      "above_random": 0.167,
+      "time_s": 696
+    },
+    {
+      "n_train": 200,
+      "test_cos": 0.855,
+      "test_ssim": 0.459,
+      "linear_cos": 0.865,
+      "gap": -0.01,
+      "above_random": 0.169,
+      "time_s": 485
+    },
+    {
+      "n_train": 300,
+      "test_cos": 0.861,
+      "test_ssim": 0.5,
+      "linear_cos": 0.868,
+      "gap": -0.007,
+      "above_random": 0.176,
+      "time_s": 639
+    },
+    {
+      "n_train": 400,
+      "test_cos": 0.871,
+      "test_ssim": 0.531,
+      "linear_cos": 0.87,
+      "gap": 0.001,
+      "above_random": 0.186,
+      "time_s": 666
+    }
+  ],
+  "baseline_cos": 0.6852497723541762
+}

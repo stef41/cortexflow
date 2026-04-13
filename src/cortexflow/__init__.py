@@ -39,7 +39,7 @@ from cortexflow.flow_matching import EMAModel, RectifiedFlowMatcher
 from cortexflow.training import SyntheticBrainDataset, Trainer, WarmupCosineScheduler
 from cortexflow.vae import AudioVAE, LatentVAE
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     # Types

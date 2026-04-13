@@ -2,6 +2,24 @@
 
 All notable changes to CortexFlow will be documented in this file.
 
+## [0.5.0] - 2026-04-13
+
+### Added
+
+- **Scaling study** (`scaling_study.py`): Train the full image pipeline at 6 data scales (50–400 samples) with fixed test set. Shows DiT matches linear across all scales and slightly exceeds it at 400 samples. SSIM doubles from 0.265 to 0.531.
+- **Ablation study** (`ablation_study.py`): Quantify each component's contribution — brain pre-training (+0.025 cos) and residual training (+0.024 cos) close 87% of the gap to linear baseline.
+- **Residual DiT training**: Train DiT on `(latent - linear_pred)` residuals for images. At inference: `final = linear_pred + DiT_residual`. Focuses model capacity on nonlinear patterns.
+- **EMA model** (`EMAModel`): Exponential moving average for stable sampling (decay=0.999).
+- **Multi-sample averaging**: Average multiple ODE samples to reduce variance (`n_avg=8`).
+- **Scaled demo to 500 samples**: 400 train / 100 test, covering 500 distinct words.
+- **Audio MelVAE latent-space training**: Train audio DiT in MelVAE latent space rather than raw mel spectrograms.
+
+### Changed
+
+- `train_loop()` now accepts `weight_decay` parameter (default 0.05)
+- `evaluate_images()` now accepts `num_steps` parameter (default 50)
+- Demo uses vision-encoded audio (mel-as-image through `vision_forward`) instead of audio encoder
+
 ## [0.4.0] - 2026-04-12
 
 ### Added

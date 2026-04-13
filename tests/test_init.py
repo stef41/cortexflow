@@ -7,7 +7,7 @@ class TestImports:
     def test_import_cortexflow(self):
         import cortexflow
         assert hasattr(cortexflow, "__version__")
-        assert cortexflow.__version__ == "0.4.0"
+        assert cortexflow.__version__ == "0.5.0"
 
     def test_import_types(self):
         from cortexflow import BrainData, Modality, ReconstructionResult
