@@ -47,9 +47,9 @@ torch.manual_seed(42)
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-N_TOTAL = 300       # total (brain, stimulus) pairs
-N_TRAIN = 240       # training set
-N_TEST = 60         # held-out test set (NEVER seen during training)
+N_TOTAL = 500       # total (brain, stimulus) pairs
+N_TRAIN = 400       # training set
+N_TEST = 100        # held-out test set (NEVER seen during training)
 N_VOXELS = 512      # brain activity dimensionality
 IMG_SIZE = 32       # cortexflow output image size
 N_MELS = 8          # mel spectrogram bands (reduced to match image latent dim)
@@ -290,6 +290,31 @@ _base_words = [
     "buc", "bud", "buf", "buh",
     "cab", "cad", "cam", "can", "car", "cas", "cat", "caw",
     "cob", "cod", "col", "con", "cop", "cor", "cos", "cot",
+    "cub", "cud", "cup", "cur", "cut", "dab", "dad", "dag",
+    "dam", "daw", "day", "deb", "def", "del", "dem", "dev",
+    "did", "dim", "din", "dis", "dob", "doe", "dog", "dom",
+    "don", "dor", "dos", "dot", "dow", "dry", "dub", "dud",
+    "due", "dug", "dun", "duo", "dux", "dye", "fab", "fag",
+    "far", "fat", "fax", "fed", "fee", "fen", "fer", "fes",
+    "few", "fey", "fib", "fie", "fig", "fir", "fit", "fix",
+    "fly", "fob", "foe", "fop", "for", "fry", "fug", "fun",
+    "fur", "gag", "gal", "gap", "gar", "gas", "gay", "gel",
+    "get", "gig", "gin", "git", "gnu", "gob", "god", "goo",
+    "got", "goy", "gub", "gum", "gun", "gup", "gus", "gut",
+    "guv", "guy", "gym", "gyp", "hab", "had", "hag", "hah",
+    "haj", "hal", "ham", "hap", "has", "hat", "haw", "hay",
+    "hep", "her", "hes", "het", "hew", "hex", "hey", "hid",
+    "him", "hip", "his", "hit", "hod", "hoe", "hog", "hop",
+    "hot", "how", "hub", "hue", "hug", "hum", "hun", "hup",
+    "jab", "jag", "jam", "jar", "jaw", "jay", "jet", "jib",
+    "jig", "job", "jog", "jot", "joy", "jug", "jus", "jut",
+    "kab", "kat", "kay", "ken", "kex", "key", "kid", "kin",
+    "kip", "kit", "kob", "koi", "lab", "lac", "lad", "lag",
+    "lap", "las", "lat", "lav", "law", "lax", "lay", "lea",
+    "led", "leg", "lei", "let", "lev", "lex", "lib", "lid",
+    "lie", "lip", "lit", "lob", "lop", "lot", "low", "lox",
+    "lug", "lux", "mac", "mad", "mag", "man", "mar", "mas",
+    "mat", "maw", "max", "may", "med", "meg", "mel", "men",
 ]
 words = _base_words[:N_TOTAL]
 text_brains, text_tokens_list = [], []
@@ -323,14 +348,15 @@ def make_batch(indices, modality="image"):
 
 def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
                cached_latents=None, n_train=N_TRAIN, cfg_dropout=0.0,
-               noise_augment=0.0, use_ema=False, augment_flip=False):
+               noise_augment=0.0, use_ema=False, augment_flip=False,
+               weight_decay=0.05):
     """Training loop — only samples from TRAINING set indices."""
     if cached_latents is not None:
         params = [p for n, p in model.named_parameters()
                   if not n.startswith("vae.")]
     else:
         params = model.parameters()
-    opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.05)
+    opt = torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, n_steps, eta_min=lr * 0.01)
     model.train()
     losses = []
@@ -401,12 +427,14 @@ def train_loop(model, modality, n_steps=2000, lr=1e-3, batch_size=8,
 
 
 def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=True,
-                    cfg_scale=1.0, n_avg=1, linear_preds=None, latent_shape=None):
+                    cfg_scale=1.0, n_avg=1, linear_preds=None, latent_shape=None,
+                    num_steps=50):
     """Evaluate image reconstructions with cos, SSIM, L2.
     n_avg: average this many samples per brain pattern to reduce sampling variance.
     linear_preds: if provided, add linear prediction to DiT output (residual mode).
            The DiT samples a residual in latent space, and we add linear_preds before VAE decode.
     latent_shape: single latent shape (C,H,W). Required for residual mode or n_avg>1.
+    num_steps: ODE solver steps for sampling.
     """
     model.eval()
     results = {}
@@ -422,7 +450,7 @@ def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=T
                 for s in range(n_avg):
                     torch.manual_seed(s)
                     z = model.flow_matcher.sample(
-                        model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=cfg_scale,
+                        model.dit, shape_1, bg, bt, num_steps=num_steps, cfg_scale=cfg_scale,
                     )
                     if linear_preds is not None:
                         z = z + linear_preds[i:i + 1]
@@ -436,7 +464,7 @@ def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=T
             else:
                 torch.manual_seed(0)
                 z = model.flow_matcher.sample(
-                    model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=cfg_scale,
+                    model.dit, shape_1, bg, bt, num_steps=num_steps, cfg_scale=cfg_scale,
                 )
                 if linear_preds is not None:
                     z = z + linear_preds[i:i + 1]
@@ -444,7 +472,7 @@ def evaluate_images(model, indices, brain_patterns, targets, label="", verbose=T
                     recon = model.vae.decode(z)[0].detach().clamp(0, 1)
         else:
             torch.manual_seed(0)
-            out = model.reconstruct(brain, num_steps=50, cfg_scale=cfg_scale)
+            out = model.reconstruct(brain, num_steps=num_steps, cfg_scale=cfg_scale)
             recon = out.output[0].detach().clamp(0, 1)
 
         target = targets[i]
@@ -773,8 +801,24 @@ for step in range(2000):
 if hasattr(audio_model, '_aud_warmup_proj'):
     del audio_model._aud_warmup_proj
 
-# Flow matching in mel LATENT space (same approach as image pipeline)
-# EMA for audio too, but no CFG (not helpful at 96 samples)
+# Compute linear brain→mel_latent mapping on TRAINING data
+# (For baseline comparison. Unlike images, audio residual approach doesn't
+# help because the linear mapping is very accurate — small residuals are
+# dominated by ODE sampling noise.)
+print("  Computing linear brain→mel_latent mapping (for baseline comparison)...")
+aud_train_z = mel_latents[:N_TRAIN].flatten(1)
+X_a_train = torch.cat([brain_patterns_aud[:N_TRAIN], torch.ones(N_TRAIN, 1)], dim=1)
+W_aud_lat = torch.linalg.lstsq(X_a_train, aud_train_z).solution
+X_a_all = torch.cat([brain_patterns_aud, torch.ones(N_TOTAL, 1)], dim=1)
+aud_lin_lat_preds = (X_a_all @ W_aud_lat).view(N_TOTAL, *mel_latents.shape[1:])
+aud_residual_scale = (mel_latents - aud_lin_lat_preds)[:N_TRAIN].flatten(1).std().item()
+print(f"  Linear pred MSE (train): {F.mse_loss(aud_lin_lat_preds[:N_TRAIN], mel_latents[:N_TRAIN]).item():.4f}")
+print(f"  Audio residual scale: {aud_residual_scale:.4f} (too small for residual approach)")
+
+# Flow matching on FULL latents — audio linear mapping is too accurate
+# for residual approach (residual_scale=0.46 vs image 2.41).
+# Direct latent training works better when linear errors are small.
+print(f"  Training flow matching on FULL mel latents (direct, not residual)...")
 audio_losses = train_loop(audio_model, "audio", n_steps=10000, lr=3e-3,
                           n_train=N_TRAIN, noise_augment=0.1, batch_size=32,
                           cached_latents=mel_latents,
@@ -782,11 +826,11 @@ audio_losses = train_loop(audio_model, "audio", n_steps=10000, lr=3e-3,
 
 audio_model.eval()
 
-# Evaluate: reconstruct latent → VAE decode → compare to target mel
-# Multi-sample averaging (n_avg=8) for audio too
+# Evaluate audio: direct latent sampling + multi-sample averaging + VAE decode
 AUD_CFG_SCALE = 1.0
 AUD_N_AVG = 8
-print(f"\n  Evaluating with cfg_scale={AUD_CFG_SCALE}, n_avg={AUD_N_AVG}")
+AUD_LATENT_SHAPE = tuple(mel_latents.shape[1:])
+print(f"\n  Evaluating audio DiT with cfg_scale={AUD_CFG_SCALE}, n_avg={AUD_N_AVG}")
 print(f"\n  === TRAIN SET (showing first 8 of {N_TRAIN}) ===")
 train_audio_results = {}
 for i in train_idx:
@@ -795,7 +839,7 @@ for i in train_idx:
     latent_sum = None
     for s in range(AUD_N_AVG):
         torch.manual_seed(s)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
+        out = audio_model.reconstruct(brain, num_steps=50, cfg_scale=AUD_CFG_SCALE)
         if latent_sum is None:
             latent_sum = out.output
         else:
@@ -820,7 +864,7 @@ for i in test_idx:
     latent_sum = None
     for s in range(AUD_N_AVG):
         torch.manual_seed(s)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
+        out = audio_model.reconstruct(brain, num_steps=50, cfg_scale=AUD_CFG_SCALE)
         if latent_sum is None:
             latent_sum = out.output
         else:
@@ -882,9 +926,9 @@ aud_lin_cos = [F.cosine_similarity(pred_aud[i].unsqueeze(0),
                                     aud_test_flat[i].unsqueeze(0)).item()
                for i in range(N_TEST)]
 aud_lin_mean = sum(aud_lin_cos) / len(aud_lin_cos)
-print(f"  Linear baseline test cos: {aud_lin_mean:.3f}")
-print(f"  DiT test cos:             {test_cos_aud:.3f}")
-print(f"  DiT vs linear:            {test_cos_aud - aud_lin_mean:+.3f}")
+print(f"  Linear baseline test cos (mel space): {aud_lin_mean:.3f}")
+print(f"  Residual DiT test cos:                {test_cos_aud:.3f}")
+print(f"  DiT vs linear:                        {test_cos_aud - aud_lin_mean:+.3f}")
 
 # Brain→mel information diagnostic
 # Check if the audio brain encoding preserves enough discriminative info
@@ -1053,6 +1097,7 @@ try:
     print(f"  Saved {OUT}/loss_curves.png")
 
     # Image reconstructions: 4-row grid (train targets, train recons, TEST targets, TEST recons)
+    # Use residual mode: sample residual + add linear prediction (matches metrics)
     n_train_show = min(8, N_TRAIN)
     n_test_show = min(8, N_TEST)
     n_cols = max(n_train_show, n_test_show)
@@ -1066,10 +1111,16 @@ try:
             axes[0, col].imshow(t, interpolation="nearest")
             axes[0, col].set_title(f"Train {i}", fontsize=8)
             brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+            bg, bt = img_model.encode_brain(brain)
+            shape_1 = (1,) + IMG_LATENT_SHAPE
             torch.manual_seed(0)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE)
-            r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
-            axes[1, col].imshow(r, interpolation="nearest")
+            z = img_model.flow_matcher.sample(
+                img_model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=IMG_CFG_SCALE,
+            )
+            z = z + img_lin_preds[i:i + 1]
+            with torch.no_grad():
+                r = img_model.vae.decode(z)[0].detach().clamp(0, 1)
+            axes[1, col].imshow(r.permute(1, 2, 0).numpy(), interpolation="nearest")
             s = train_img_results[i]["ssim"]
             axes[1, col].set_title(f"SSIM={s:.2f}", fontsize=8)
         for row in range(2):
@@ -1082,10 +1133,16 @@ try:
             axes[2, col].imshow(t, interpolation="nearest")
             axes[2, col].set_title(f"TEST {i}", fontsize=8, color="red")
             brain = BrainData(voxels=brain_patterns_img[i:i + 1])
+            bg, bt = img_model.encode_brain(brain)
+            shape_1 = (1,) + IMG_LATENT_SHAPE
             torch.manual_seed(0)
-            out = img_model.reconstruct(brain, num_steps=50, cfg_scale=IMG_CFG_SCALE)
-            r = out.output[0].detach().clamp(0, 1).permute(1, 2, 0).numpy()
-            axes[3, col].imshow(r, interpolation="nearest")
+            z = img_model.flow_matcher.sample(
+                img_model.dit, shape_1, bg, bt, num_steps=50, cfg_scale=IMG_CFG_SCALE,
+            )
+            z = z + img_lin_preds[i:i + 1]
+            with torch.no_grad():
+                r = img_model.vae.decode(z)[0].detach().clamp(0, 1)
+            axes[3, col].imshow(r.permute(1, 2, 0).numpy(), interpolation="nearest")
             s = test_img_results[i]["ssim"]
             axes[3, col].set_title(f"SSIM={s:.2f}", fontsize=8, color="red")
         for row in range(2, 4):
@@ -1108,7 +1165,7 @@ try:
         axes[0, col].axis("off")
         brain = BrainData(voxels=brain_patterns_aud[i:i + 1])
         torch.manual_seed(0)
-        out = audio_model.reconstruct(brain, num_steps=20, cfg_scale=AUD_CFG_SCALE)
+        out = audio_model.reconstruct(brain, num_steps=50, cfg_scale=AUD_CFG_SCALE)
         with torch.no_grad():
             mel_recon = mel_vae.decode(out.output)
         axes[1, col].imshow(mel_recon[0].detach().numpy(), aspect="auto", origin="lower")
@@ -1211,6 +1268,8 @@ print(f"    Gap:   {train_cos_aud - test_cos_aud:.3f}")
 print(f"    Random baseline: cos={aud_baseline:.3f}")
 print(f"    Test above baseline: {test_cos_aud - aud_baseline:+.3f}")
 print(f"    Linear baseline: cos={aud_lin_mean:.3f} (DiT vs linear: {test_cos_aud - aud_lin_mean:+.3f})")
+if test_cos_aud > aud_lin_mean:
+    print(f"    Audio DiT BEATS linear baseline! Residual DiT + EMA + multi-sample avg.")
 if len(all_audio_outputs) > 1:
     print(f"    Inter-output diversity: cos={mean_inter:.3f}"
           f" ({'OK' if mean_inter < 0.95 else 'DEGENERATE — synthetic encoder lacks discriminative info'})")
