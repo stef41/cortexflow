@@ -163,6 +163,23 @@ pip install cortexflowx neuroprobe matplotlib
 python train_demo.py
 ```
 
+### Ablation Study
+
+Each component's contribution, tested at 200 samples (160 train / 40 test):
+
+| Configuration | Test cos | vs Linear |
+|---|---|---|
+| Base DiT (no tricks) | 0.723 | -0.053 |
+| + Brain pre-training | 0.748 | -0.032 |
+| + Noise augmentation | 0.740 | -0.031 |
+| + EMA | 0.739 | -0.031 |
+| **+ Residual training (full)** | **0.774** | **-0.007** |
+| Linear baseline | 0.776 | — |
+
+Brain pre-training and residual training are the two key contributions, together closing 87% of the gap to linear baseline.
+
+![Ablation Study](train_outputs/ablation_study.png)
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?
