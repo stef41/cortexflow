@@ -137,6 +137,32 @@ result = model.reconstruct(brain_data)
 ema.restore(model, originals)
 ```
 
+## Demo: End-to-End Training on Synthetic Data
+
+`train_demo.py` trains all three pipelines from scratch on CPU using [neuroprobe](https://github.com/stef41/neuroprobe)'s forward encoding model to generate realistic (brain, stimulus) pairs.
+
+**Setup:** 500 total samples (400 train / 100 held-out test), 512 voxels, 32×32 images.
+
+**Key technique — Residual DiT:** Instead of generating images from scratch, we train the DiT on *what linear regression gets wrong*. At inference: `final = linear_pred + DiT_residual`. This focuses the model's capacity on nonlinear patterns that linear misses.
+
+| Modality | Test cos | SSIM | Above random | vs Linear | Diverse? |
+|----------|----------|------|--------------|-----------|----------|
+| Image    | 0.858    | 0.503 | +0.173      | -0.005    | ✓ (0.888) |
+| Audio    | 0.893    | —    | +0.349       | -0.014    | ✓ (0.727) |
+| Text     | 0/100    | —    | expected     | —         | —        |
+
+**Image reconstructions** (top: train, bottom: held-out test):
+
+![Brain → Image Reconstructions](train_outputs/image_reconstructions.png)
+
+The DiT matches linear regression at all data scales tested (96–400 train samples), while producing diverse, brain-conditioned outputs. Text is byte-level (no semantic embedding), so test generalization is not expected.
+
+Run it yourself:
+```bash
+pip install cortexflowx neuroprobe matplotlib
+python train_demo.py
+```
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?
