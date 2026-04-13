@@ -342,6 +342,29 @@ pip install cortexflowx transformers huggingface_hub sentence-transformers matpl
 CUDA_VISIBLE_DEVICES=0 python train_tribe.py
 ```
 
+### Natural Image Reconstruction (STL-10)
+
+`train_natural.py` takes the experiment further: reconstruct **real photographs** (STL-10, 100k unlabeled natural images) at 128×128 resolution using a 23M-param model.
+
+| Metric | Shapes (64×64) | Natural (128×128) |
+|--------|:-:|:-:|
+| Test cosine | 0.976 | 0.872 |
+| Test SSIM | 0.923 | 0.451 |
+| **DiT gap (cos)** | +0.038 | **+0.028** |
+| **DiT gap (SSIM)** | — | **+0.055** |
+| VLM correctness | 0.776 | 0.564 |
+| Intra-brain diversity | 0.013 | **0.051** |
+
+Key finding: the **nonlinear benefit of DiT is larger for natural images** (+0.055 SSIM vs linear) — complex real-world content has richer structure that linear regression cannot fully capture. VLM confirms semantic content is preserved (e.g., horse → "horse's head against green background", sim=0.825). Diversity is 4× higher than shapes — the model generates meaningful variation for natural scenes.
+
+![Natural Image Reconstructions](train_outputs/natural_reconstructions.png)
+
+![Natural Image Diversity](train_outputs/natural_diversity.png)
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python train_natural.py
+```
+
 ## References
 
 - Peebles & Xie (2022). "Scalable Diffusion Models with Transformers." arXiv:2212.09748
