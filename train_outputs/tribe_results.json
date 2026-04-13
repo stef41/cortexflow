@@ -1,0 +1,67 @@
+{
+  "forward_model": "TRIBE v2 (facebook/tribev2)",
+  "feature_extractor": "V-JEPA2 ViT-Giant",
+  "n_voxels": 384,
+  "img_size": 64,
+  "test_cos": 0.9757,
+  "test_cos_std": 0.0252,
+  "test_ssim": 0.9233,
+  "test_ssim_std": 0.0611,
+  "linear_baseline_cos": 0.9375,
+  "gap": 0.0382,
+  "vlm_correctness": 0.7757,
+  "vlm_diversity": 0.3187,
+  "intra_brain_diversity": 0.0129,
+  "captions": {
+    "4000": {
+      "target": "The image features a horizontal rectangle with a light pink center, flanked by two dark blue vertical rectangles at each end, set against a solid dark blue background.",
+      "recon": "The image features a rectangular shape with a gradient of pink hues, transitioning from a lighter shade at the top to a darker shade at the bottom, positioned horizontally across the center of the frame against a solid dark purple background.",
+      "sim": 0.8018
+    },
+    "4001": {
+      "target": "The image features a small, light teal square positioned centrally against a dark brown background.",
+      "recon": "The image features a square with a light teal or turquoise hue positioned centrally against a dark, almost black background. The square is slightly tilted to the left, creating a subtle sense of asymmetry within the composition.",
+      "sim": 0.8394
+    },
+    "4002": {
+      "target": "The image features a horizontal rectangle with a light green stripe centered against a dark green background.",
+      "recon": "The image features a white rectangle centered against a solid green background.",
+      "sim": 0.8659
+    },
+    "4003": {
+      "target": "The image features a light blue circle positioned centrally against a dark green background.",
+      "recon": "The image features a light blue, irregularly shaped object positioned centrally against a dark green background. The object appears to be a small, possibly organic form, with a slightly darker blue hue at the bottom right corner, suggesting a shadow or gradient effect.",
+      "sim": 0.7772
+    },
+    "4004": {
+      "target": "The image features a horizontal rectangle with a light green color, positioned centrally against a dark green background.",
+      "recon": "The image features a horizontal rectangular shape with a gradient of green hues, positioned centrally against a darker green background. The rectangle appears to be slightly blurred, giving it a soft, almost ethereal quality.",
+      "sim": 0.7473
+    },
+    "4005": {
+      "target": "The image features a light gray rectangle positioned centrally against a dark teal background.",
+      "recon": "The image features a prominent white rectangle centered against a solid green background. The white rectangle is slightly tilted to the left, creating a subtle asymmetry within the composition.",
+      "sim": 0.7207
+    },
+    "4006": {
+      "target": "The image features a single, light beige circle positioned centrally against a dark brown background.",
+      "recon": "The image features a large, bright yellow circle positioned centrally against a dark, almost black background. The circle appears to be a close-up of a light source, possibly a lamp or a flashlight, casting a strong glow that contrasts sharply with the surrounding darkness.",
+      "sim": 0.7101
+    },
+    "4007": {
+      "target": "The image features a light teal, pixelated circle centered against a deep navy blue background.",
+      "recon": "The image features a large, bright green circle positioned centrally against a deep blue background. The circle appears to be illuminated, creating a stark contrast with the surrounding darkness.",
+      "sim": 0.7425
+    },
+    "4008": {
+      "target": "The image features a light green square centered against a deep purple background.",
+      "recon": "The image features a small, light blue square centered against a dark purple background.",
+      "sim": 0.8518
+    },
+    "4009": {
+      "target": "The image features a vertical rectangle with a light green center, flanked by two dark blue vertical rectangles on either side, creating a symmetrical design against a dark blue background.",
+      "recon": "The image features a vertical rectangle with a gradient of light yellow at the center transitioning to dark teal at the edges, set against a solid dark teal background.",
+      "sim": 0.7161
+    }
+  }
+}

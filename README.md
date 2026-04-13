@@ -311,6 +311,37 @@ $$h = \gamma(c) \odot \text{LayerNorm}(x) + \beta(c)$$
 
 with zero-initialized gating for stable training (Peebles & Xie 2022).
 
+### Pretrained Brain Encoding: TRIBE v2 Integration
+
+`train_tribe.py` replaces the synthetic brain encoder with Meta's pretrained [TRIBE v2](https://huggingface.co/facebook/tribev2) brain encoding model — trained on 1,000+ hours of fMRI from 720 subjects. The pipeline:
+
+1. **V-JEPA2 ViT-Giant** extracts visual features (1,035M params, layers 20+30 → 2,816-dim)
+2. **TRIBE v2** maps features → predicted fMRI BOLD activity (20,484 cortical vertices on fsaverage5)
+3. **PCA** reduces to 384 dimensions (full rank of the video projector bottleneck)
+4. **cortexflow** reconstructs 64×64 images from the brain patterns
+
+| Metric | Value |
+|--------|-------|
+| Test cosine similarity | **0.976 ± 0.025** |
+| Test SSIM | **0.923 ± 0.061** |
+| VAE reconstruction ceiling | 0.997 |
+| DiT gap vs linear | **+0.038** |
+| VLM semantic correctness | **0.776** |
+| Inter-brain diversity | 0.319 |
+
+The DiT **outperforms** linear regression by +0.038 cosine on held-out test data — the first demonstration of nonlinear benefit with pretrained brain features. VLM captioning (Qwen2.5-VL-7B) confirms semantic accuracy: shapes, colors, and positions are correctly reconstructed.
+
+![TRIBE v2 Reconstructions](train_outputs/tribe_reconstructions.png)
+
+Multiple samples from different brain patterns produce **semantically diverse** outputs — circles, squares, stripes, and splits are all clearly distinguishable:
+
+![Diversity](train_outputs/tribe_diversity.png)
+
+```bash
+pip install cortexflowx transformers huggingface_hub sentence-transformers matplotlib
+CUDA_VISIBLE_DEVICES=0 python train_tribe.py
+```
+
 ## References
 
 - Peebles & Xie (2022). "Scalable Diffusion Models with Transformers." arXiv:2212.09748
@@ -318,6 +349,7 @@ with zero-initialized gating for stable training (Peebles & Xie 2022).
 - Lipman et al. (2024). "Flow Matching Guide and Code." arXiv:2412.06264
 - Scotti et al. (2023). "Reconstructing the Mind's Eye: fMRI-to-Image with Contrastive Learning and Diffusion Priors."
 - Ozcelik & VanRullen (2023). "Brain-Diffuser: Natural Scene Reconstruction from fMRI Using a Latent Diffusion Model."
+- Défossez et al. (2024). "TRIBE v2: Scaling Brain Encoding Models." Meta AI.
 
 ## License
 
