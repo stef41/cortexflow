@@ -201,6 +201,26 @@ Key findings:
 
 ![Scaling Study](train_outputs/scaling_curve.png)
 
+### Cross-Validation
+
+5-fold CV on 500 samples (400 train / 100 test per fold) confirms results are stable across data splits:
+
+| Fold | DiT cos | SSIM | Linear cos | Gap |
+|------|---------|------|------------|-----|
+| 1 | 0.846 | 0.473 | 0.869 | -0.023 |
+| 2 | 0.877 | 0.565 | 0.884 | -0.006 |
+| 3 | 0.877 | 0.542 | 0.883 | -0.006 |
+| 4 | 0.887 | 0.558 | 0.885 | +0.002 |
+| 5 | 0.864 | 0.570 | 0.869 | -0.005 |
+| **Mean ± std** | **0.870 ± 0.016** | **0.541 ± 0.040** | **0.878 ± 0.008** | **-0.008 ± 0.009** |
+
+**95% Confidence Intervals** (t-distribution, df=4):
+- DiT cosine similarity: **0.870 ± 0.020** → [0.850, 0.890]
+- SSIM: **0.541 ± 0.049** → [0.492, 0.591]
+- Gap vs linear: **-0.008 ± 0.011** → [-0.019, +0.004] (includes zero → **statistically indistinguishable**)
+
+![Cross-Validation](train_outputs/cv_summary.png)
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?
