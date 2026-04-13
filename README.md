@@ -221,6 +221,22 @@ Key findings:
 
 ![Cross-Validation](train_outputs/cv_summary.png)
 
+### Representation Analysis
+
+What did the brain encoder learn? PCA of brain embeddings reveals clear clustering by visual features, and per-shape analysis shows which stimuli are easy/hard to reconstruct:
+
+| Shape Type | Test cos | SSIM | n |
+|------------|----------|------|---|
+| Split (two-color) | **0.994** | **0.733** | 19 |
+| Circle | 0.869 | 0.532 | 21 |
+| Rectangle | 0.852 | 0.505 | 23 |
+| Horizontal stripe | 0.832 | 0.489 | 21 |
+| Vertical stripe | 0.773 | 0.268 | 16 |
+
+Simple patterns (splits) are near-perfectly reconstructed. Complex local features (thin stripes) are hardest. Image brightness positively correlates with quality (r=0.52), while high contrast hurts (r=-0.49) — the model excels at global color patterns, struggles with sharp local edges.
+
+![Representation Analysis](train_outputs/representation_analysis.png)
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?
