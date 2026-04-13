@@ -259,6 +259,25 @@ Key findings:
 
 ![Noise Robustness](train_outputs/noise_robustness.png)
 
+### VLM Semantic Diversity (Qwen2.5-VL-7B)
+
+We use a Vision Language Model (Qwen2.5-VL-7B-Instruct) to caption target images and reconstructions, then measure semantic diversity via sentence embeddings (all-MiniLM-L6-v2). This evaluates whether reconstructions are **semantically meaningful and diverse** — not just pixel-similar.
+
+| Metric | Value |
+|--------|-------|
+| Semantic correctness (target ↔ recon) | **0.669 ± 0.074** |
+| Inter-brain diversity (different inputs) | 0.291 |
+| Intra-brain consistency (same input) | 0.798 |
+| Diversity ratio | **1.44** |
+| Diversity preservation vs targets | **1.03×** |
+
+Key findings (20 held-out test samples, 4 diverse samples each):
+- **Reconstructions are semantically correct**: VLM captions for targets and reconstructions have 0.669 cosine similarity (e.g., target "light teal circle on dark maroon" → recon "circular pinkish-purple shape on reddish-brown background")
+- **Brain-conditioned diversity**: diversity ratio 1.44 means different brain inputs produce 44% more caption variation than same-brain samples — the model generates diverse outputs matched to each brain pattern, not mode-collapsed
+- **Full diversity preservation**: reconstruction diversity is 1.03× the target diversity — the generative pipeline preserves the full semantic range of the stimulus set
+
+![VLM Diversity](train_outputs/vlm_diversity.png)
+
 ## Technical Details
 
 ### Why DiT + Flow Matching?

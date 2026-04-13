@@ -1,0 +1,250 @@
+{
+  "vlm_model": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "embed_model": "all-MiniLM-L6-v2",
+  "n_test_samples": 20,
+  "n_diverse": 4,
+  "metrics": {
+    "semantic_correctness": {
+      "mean": 0.6687,
+      "std": 0.0737,
+      "min": 0.5271,
+      "max": 0.8136
+    },
+    "inter_brain_diversity": {
+      "mean_similarity": 0.7091,
+      "std": 0.0931,
+      "diversity_score": 0.2909
+    },
+    "intra_brain_consistency": {
+      "mean_similarity": 0.7984,
+      "std": 0.0839
+    },
+    "diversity_ratio": 1.4433,
+    "target_diversity": {
+      "mean_similarity": 0.7178,
+      "diversity_preservation": 1.0307
+    }
+  },
+  "captions": {
+    "400": {
+      "target": "The image features a light teal, pixelated circle centered against a deep maroon background.",
+      "recon_avg": "The image features a circular, slightly blurred pinkish-purple shape centered against a warm, reddish-brown textured background.",
+      "samples": [
+        "The image features a circular, translucent object with a gradient of pink hues, positioned centrally against a warm, reddish-brown background. The object appears to be slightly out of focus, giving it a soft, ethereal quality.",
+        "The image features a circular, light pink shape with a slightly blurred edge, positioned centrally against a warm, brownish-orange background.",
+        "The image features a large, irregularly shaped object with a gradient of pink hues, positioned centrally against a soft, pastel pink background. The object's edges are not sharply defined, giving it a somewhat abstract appearance.",
+        "The image features a circular, slightly blurred pinkish-purple shape centered against a warm, earthy brown background. The circle appears to be softly out of focus, giving it a dreamy, ethereal quality."
+      ],
+      "correctness": 0.7489
+    },
+    "401": {
+      "target": "The image features a light blue, circular shape centered against a dark green background.",
+      "recon_avg": "The image features a blurry, translucent, light blue sphere positioned centrally against a dark green grid-like background. The sphere appears to be slightly out of focus, giving it a soft, ethereal quality.",
+      "samples": [
+        "The image features a circular, translucent object with a gradient of colors ranging from light blue to pink, positioned slightly off-center against a dark green background.",
+        "The image features a light blue, irregularly shaped object resembling a cloud or a cluster of bubbles, positioned centrally against a dark green background. The object has a soft, diffuse outline with variations in shade, giving it a three-dimensional appearance.",
+        "The image features a blurry, translucent sphere with a gradient of light blue to white, positioned centrally against a dark green grid-like background.",
+        "The image features a circular, translucent object with a gradient of light purple to white, positioned centrally against a dark green, grid-like background."
+      ],
+      "correctness": 0.6823
+    },
+    "402": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a thin white line; the left half is filled with a vibrant pink color, while the right half is filled with a soft teal color, set against a plain white background.",
+      "recon_avg": "The image features a large, irregularly shaped pink triangle positioned on the left side, with a light blue rectangular area occupying the right side of the frame against a pastel-colored background that transitions from light blue to light purple.",
+      "samples": [
+        "The image features a large, irregularly shaped, pastel-colored object that resembles a cloud or abstract form, primarily in shades of pink, blue, and green, positioned centrally against a gradient background transitioning from light blue to white.",
+        "The image features a large, irregularly shaped object with a gradient of pastel colors, primarily pink and blue, positioned centrally against a light blue background.",
+        "The image features a large, irregularly shaped, pastel-colored object that resembles a cloud or a nebula, primarily in shades of pink, blue, and green, positioned centrally against a gradient background transitioning from light blue to white.",
+        "The image features a vertical rectangle with a gradient of light blue and purple hues, positioned against a background that transitions from a lighter to a darker shade of purple."
+      ],
+      "correctness": 0.6908
+    },
+    "403": {
+      "target": "The image features a light teal square centered against a dark olive green background.",
+      "recon_avg": "The image features a blurry, irregularly shaped object with a gradient of purple hues, positioned centrally against a dark green background. The object's edges are not sharply defined, giving it a soft, almost ethereal appearance.",
+      "samples": [
+        "The image features a blurry, light purple, rounded shape resembling a mushroom cap, positioned centrally against a dark green, textured background that appears to be grass.",
+        "The image features a blurry, circular object with a gradient of purple hues, positioned centrally against a dark green background. The object appears to be a sphere or a lens-like shape, though the blurriness makes it difficult to discern precise details.",
+        "The image features a large, irregularly shaped purple rectangle positioned centrally against a gradient green background that transitions from a darker shade at the top to a lighter shade at the bottom.",
+        "The image features a blurry, circular object with a gradient of light purple to white, positioned centrally against a solid green background."
+      ],
+      "correctness": 0.5823
+    },
+    "404": {
+      "target": "The image features a light beige square centered against a dark green background.",
+      "recon_avg": "The image features a blurred, light green, irregularly shaped object resembling a cup or vase, positioned centrally against a darker green background.",
+      "samples": [
+        "The image features a vertical, elongated, rectangular prism with a gradient of green hues, transitioning from a lighter shade at the top to a darker green at the bottom, positioned centrally against a dark, almost black background.",
+        "The image features a square with a gradient of yellow to orange hues, positioned centrally against a blurred green background.",
+        "The image features a square with a gradient of light green to yellow at its center, positioned slightly off-center against a dark green background.",
+        "The image features a vertical, elongated, light blue-green rectangle with a slightly darker blue-green border, positioned centrally against a dark green background."
+      ],
+      "correctness": 0.6763
+    },
+    "405": {
+      "target": "The image features a vertical rectangle divided into three equal sections by two vertical lines; the left and right sections are filled with a dark green color, while the central section is filled with a light beige color. The background of the entire image is white.",
+      "recon_avg": "The image features a large, irregularly shaped green object with a pinkish hue at its center, positioned centrally against a backdrop of varying shades of green, creating a natural, blurred effect.",
+      "samples": [
+        "The image features a blurry, abstract representation of a human figure with a light pinkish hue, positioned centrally against a predominantly green background with hints of yellow and blue, suggesting a natural setting like grass or foliage.",
+        "The image features a large, irregularly shaped green object resembling a tree or bush, positioned centrally against a backdrop of lighter green and yellow hues, suggesting a grassy field or natural setting.",
+        "The image features a blurred, abstract shape resembling a stylized tree with a light brown trunk and green foliage, set against a predominantly green background that suggests a natural setting.",
+        "The image features a large, irregularly shaped green object with a yellowish hue at the bottom, positioned centrally against a predominantly green background with hints of lighter green and yellow tones."
+      ],
+      "correctness": 0.6053
+    },
+    "406": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a thin white line; the left half is a vibrant lime green, while the right half is a soft, muted pink, set against a plain white background.",
+      "recon_avg": "The image features a large, irregularly shaped green triangle positioned centrally against a background that transitions from light green to light purple.",
+      "samples": [
+        "The image features a large, irregularly shaped, pastel-colored object that resembles a cluster of small, rounded stones or pebbles, predominantly in shades of light green and pink, positioned centrally against a gradient background transitioning from light green to light purple.",
+        "The image features a large, irregularly shaped green triangle positioned centrally against a light gray background. The triangle's edges are not perfectly straight, giving it a somewhat organic appearance.",
+        "The image features a square divided into two equal halves by a vertical line; the left half is a light green, while the right half is a soft pink, both with a subtle gradient effect. The background is a solid, muted pink that complements the right half of the square.",
+        "The image features a large, irregularly shaped green triangle positioned centrally against a pastel-colored background that transitions from light green to yellow and then to pink."
+      ],
+      "correctness": 0.677
+    },
+    "407": {
+      "target": "The image features a small, light gray square centered against a deep purple background.",
+      "recon_avg": "The image features a large, irregularly shaped object with a gradient of purple hues, positioned centrally against a background that transitions from light to dark purple, creating a subtle vignette effect.",
+      "samples": [
+        "The image features a square with a light peach or beige color, positioned centrally against a gradient background that transitions from dark purple at the edges to a lighter shade of purple towards the center.",
+        "The image features a central, irregularly shaped object with a gradient of yellow and orange hues, set against a predominantly purple background with subtle variations in shade.",
+        "The image features a blurred, circular shape with a gradient of purple hues, centered against a lighter, almost white background. The circular form is slightly out of focus, giving it a soft, dreamy appearance.",
+        "The image features a large, irregularly shaped orange object centered against a predominantly purple background with subtle variations in shade."
+      ],
+      "correctness": 0.7114
+    },
+    "408": {
+      "target": "The image features a light teal square centered within a maroon-colored rectangular frame.",
+      "recon_avg": "The image features a vertical, elongated, irregularly shaped object with a gradient of pink hues, transitioning from a lighter shade at the top to a darker shade at the bottom, set against a dark purple background.",
+      "samples": [
+        "The image features a vertical, elongated, rectangular prism with a gradient of purple hues, transitioning from a lighter shade at the top to a darker shade at the bottom, set against a dark, almost black background.",
+        "The image features a large, irregularly shaped pinkish-purple object that dominates the frame, positioned centrally against a dark, almost black background. The object's edges are somewhat blurred, giving it a soft, ethereal appearance.",
+        "The image features a blurred, irregularly shaped object with a gradient of pink hues, positioned centrally against a dark purple background. The object's edges are soft and undefined, creating a sense of motion or depth.",
+        "The image features a vertical, elongated, rectangular prism with a gradient of purple hues, transitioning from a lighter shade at the top to a darker shade at the bottom, positioned centrally against a dark, almost black background."
+      ],
+      "correctness": 0.5271
+    },
+    "409": {
+      "target": "The image features a horizontally divided rectangle with the top half in a light grayish-green and the bottom half in a darker green, set against a plain white background.",
+      "recon_avg": "The image features a horizontally elongated, irregularly shaped object with a gradient of pink hues, transitioning from a lighter shade at the top to a darker shade at the bottom, set against a solid dark green background.",
+      "samples": [
+        "The image features a horizontally elongated, irregularly shaped object with a gradient of colors ranging from light pink to light blue, positioned centrally against a solid green background.",
+        "The image features a large, irregularly shaped pink triangle positioned centrally against a dark green background. The triangle's edges are not perfectly straight, giving it a somewhat organic appearance.",
+        "The image features a horizontally elongated, irregularly shaped object with a gradient of pink hues, transitioning from a lighter shade at the top to a darker pink at the bottom, set against a dark green background.",
+        "The image features a large, irregularly shaped object with a gradient of pink hues, positioned centrally against a dark green background. The object's edges are somewhat blurred, giving it a soft, almost ethereal appearance."
+      ],
+      "correctness": 0.7297
+    },
+    "410": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a thin white line; the left half is filled with a soft pink hue, while the right half is a pale yellow, both colors being pastel and smooth. The rectangle is centered against a plain white background.",
+      "recon_avg": "The image features a large, irregularly shaped, light pink and purple gradient object that dominates the center of the frame, with a subtle gradient effect transitioning from a lighter shade at the top to a slightly darker hue at the bottom. The background is a solid, muted lavender color, providing a soft contrast to the vibrant foreground object.",
+      "samples": [
+        "The image features a large, irregularly shaped, light pink polygonal object positioned centrally against a gradient background that transitions from light purple to light orange.",
+        "The image features a large, irregularly shaped, light pink polygon that dominates the center of the frame, set against a gradient background transitioning from light pink to white.",
+        "The image features a large, irregularly shaped pink triangle positioned centrally against a gradient background that transitions from light blue at the top to light pink at the bottom.",
+        "The image features a large, irregularly shaped, light purple hexagon positioned centrally against a gradient background that transitions from light pink to light blue."
+      ],
+      "correctness": 0.6443
+    },
+    "411": {
+      "target": "The image features a light green square centered against a dark teal background.",
+      "recon_avg": "The image features a vertical, elongated, light teal rectangle with a slightly darker teal border, positioned centrally against a solid dark teal background.",
+      "samples": [
+        "The image features a vertical, elongated, rectangular prism with a gradient of light blue to white, positioned centrally against a solid teal background.",
+        "The image features a vertical, elongated, light teal cylinder positioned slightly off-center against a darker teal background. The cylinder's smooth surface reflects some light, giving it a subtle sheen.",
+        "The image features a vertical, elongated, light blue-green cylinder positioned centrally against a darker teal-green background. The cylinder's smooth surface reflects some light, giving it a slightly glossy appearance.",
+        "The image features a vertical, elongated, light teal cylinder positioned slightly off-center against a darker teal background. The cylinder's smooth surface reflects some light, giving it a subtle gradient effect from lighter at the top to slightly darker at the bottom."
+      ],
+      "correctness": 0.8136
+    },
+    "412": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a thin white line; the left half is a deep maroon, while the right half is a light sage green, set against a plain off-white background.",
+      "recon_avg": "The image features a vertical, elongated, rectangular prism with a gradient of colors ranging from light blue at the top to white in the middle, and then transitioning into a darker blue at the bottom. The prism is positioned against a solid brown background.",
+      "samples": [
+        "The image features a vertical, elongated, rectangular prism with a gradient of light blue to white hues, positioned centrally against a warm, reddish-brown background.",
+        "The image features a vertical, elongated, rectangular prism with a gradient of light blue to white hues, positioned against a dark brown, textured background.",
+        "The image features a vertical, elongated, rectangular prism with a gradient of colors ranging from light green at the bottom to a darker purple at the top, set against a warm, reddish-brown background.",
+        "The image features a vertical, elongated, rectangular prism with a gradient of colors ranging from light blue at the top to white in the middle, and then transitioning into a darker blue towards the bottom. The prism is positioned against a solid, warm brown background that appears slightly textured."
+      ],
+      "correctness": 0.6016
+    },
+    "413": {
+      "target": "The image features a horizontally oriented rectangle with a light purple stripe centered against a deep maroon background.",
+      "recon_avg": "The image features a large, irregularly shaped object with a gradient of purple hues, positioned centrally against a dark, almost black background. The object's edges are soft and blurred, giving it a somewhat abstract appearance.",
+      "samples": [
+        "The image features a large, irregularly shaped object with a gradient of purple hues, positioned centrally against a dark, almost black background. The object has a soft, blurred appearance, giving it a dreamy quality.",
+        "The image features a large, irregularly shaped purple object centered against a gradient background that transitions from dark purple at the top to lighter purple shades towards the bottom. The object has a somewhat abstract form with no clear geometric edges, giving it a soft, almost ethereal appearance.",
+        "The image features a horizontally elongated, rectangular shape with a gradient of pink hues, transitioning from a lighter shade at the top to a darker shade at the bottom, set against a dark brown background.",
+        "The image features a large, irregularly shaped purple object centered against a gradient background that transitions from dark purple at the top to light purple at the bottom. The object has a somewhat abstract form with no clear geometric edges, giving it a soft, almost cloud-like appearance."
+      ],
+      "correctness": 0.7141
+    },
+    "414": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a thin, light green line; the left half is filled with a dark green color, while the right half remains empty against a white background.",
+      "recon_avg": "The image features a vertical, elongated, rectangular prism with a gradient of light pink to white at the top, transitioning into a darker pink towards the bottom, set against a solid green background.",
+      "samples": [
+        "The image features a vertical, elongated, light blue rectangle with a slightly curved top edge, positioned centrally against a solid green background.",
+        "The image features a vertical, elongated, teardrop-shaped object with a gradient of light blue to white at the bottom, transitioning to a darker blue at the top, set against a solid green background.",
+        "The image features a vertical, elongated, rectangular prism with a gradient of colors transitioning from light blue at the top to white in the middle, and then to a darker blue at the bottom, set against a solid green background.",
+        "The image features a vertical, elongated, irregularly shaped object with a gradient of colors ranging from light purple at the top to white at the bottom, set against a solid green background."
+      ],
+      "correctness": 0.6978
+    },
+    "415": {
+      "target": "The image features a horizontal rectangle with a light purple hue positioned centrally against a deep purple background.",
+      "recon_avg": "The image features a large, irregularly shaped object with a gradient of purple hues, positioned centrally against a dark blue background. The object's edges are somewhat blurred, giving it a soft, almost ethereal appearance.",
+      "samples": [
+        "The image features a green, elongated, rectangular shape with rounded edges positioned horizontally against a dark blue background. The rectangle is slightly tilted, giving it a dynamic appearance within the frame.",
+        "The image features a horizontally elongated, slightly curved green shape resembling a leaf or a stylized ribbon, positioned centrally against a dark blue background. The green shape has a gradient effect, transitioning from a lighter shade at the top to a darker hue at the bottom.",
+        "The image features a green, elongated, rectangular shape with rounded edges, positioned horizontally near the bottom against a dark blue background.",
+        "The image features a horizontally elongated, rectangular shape with a gradient of light green to white at the top, transitioning into a darker green towards the bottom, set against a dark, almost black background."
+      ],
+      "correctness": 0.778
+    },
+    "416": {
+      "target": "The image features a vertical rectangle divided into two equal halves by a straight line; the left half is a light beige, while the right half is a soft, pastel green, set against a plain white background.",
+      "recon_avg": "The image features a large, irregularly shaped white object that resembles a cloud or a cluster of bubbles, positioned centrally against a gradient background transitioning from light blue to white.",
+      "samples": [
+        "The image features a large, irregularly shaped white circle positioned slightly off-center to the left against a light green background. The circle appears to be the main focus of the image, with its edges blending softly into the surrounding area.",
+        "The image features a large, irregularly shaped white object that dominates the center, set against a gradient background transitioning from light green to light blue. The object's edges are soft and undefined, giving it a somewhat amorphous appearance.",
+        "The image features a large, irregularly shaped white object that dominates the left side of the frame, with a smaller, similarly shaped white object partially visible on the right. The background is a gradient of light blue to white, creating a soft, pastel effect.",
+        "The image features a large, irregularly shaped, light green triangle positioned centrally against a gradient background that transitions from light purple to light blue."
+      ],
+      "correctness": 0.5457
+    },
+    "417": {
+      "target": "The image features a square with a light purple hue positioned centrally against a dark olive green background.",
+      "recon_avg": "The image features a large, irregularly shaped pinkish-orange object that resembles a jellyfish or a similar sea creature, positioned centrally against a blurred green background. The object's edges are soft and undefined, giving it a dreamy, ethereal quality.",
+      "samples": [
+        "The image features a vertically oriented, irregularly shaped object with a gradient of pink hues, positioned centrally against a dark green background. The object's edges are somewhat blurred, giving it a soft, almost ethereal appearance.",
+        "The image features a large, irregularly shaped object with a gradient of yellow to orange hues, positioned centrally against a backdrop of green grass. The object's edges are somewhat blurred, giving it a soft, almost ethereal appearance.",
+        "The image features a large, irregularly shaped object with a gradient of yellow to orange hues, positioned centrally against a solid green background. The object's edges are somewhat blurred, giving it a soft, almost ethereal appearance.",
+        "The image features a large, irregularly shaped yellow-orange blob positioned centrally against a dark green background. The blob's edges are somewhat blurred, giving it a soft, almost ethereal appearance."
+      ],
+      "correctness": 0.5823
+    },
+    "418": {
+      "target": "The image features a square divided into two equal halves by a vertical line; the left half is a pale yellow, while the right half is a deep purple, set against a white background.",
+      "recon_avg": "The image features a large, irregularly shaped yellow-orange polygon that dominates the left side, with a smaller, similarly colored triangle positioned to its right. The background is a gradient of light purple and white, creating a soft, pastel effect.",
+      "samples": [
+        "The image features a large, irregularly shaped yellow-orange polygon that dominates the left side, with a smaller, similarly colored triangle positioned to its right. The background is a gradient of light purple and pink hues, creating a soft, pastel effect.",
+        "The image features a large, irregularly shaped yellow-orange hexagon positioned centrally against a gradient background that transitions from light purple to white.",
+        "The image features a large, irregularly shaped yellow-orange polygon that dominates the left side of the frame, with a smaller, similarly colored triangle positioned to its right. The background is a gradient transitioning from light purple at the top to white at the bottom.",
+        "The image features a large, irregularly shaped yellow-orange polygon that dominates the left side, extending vertically to the top edge of the frame. The right side is filled with a soft, pastel lavender background."
+      ],
+      "correctness": 0.6982
+    },
+    "419": {
+      "target": "The image features a horizontal rectangle with a light gray color, positioned centrally against a dark navy blue background.",
+      "recon_avg": "The image features a large, irregularly shaped, purple object that dominates the center, with a gradient of lighter to darker purple hues. The object is positioned slightly off-center towards the left side of the frame. The background is a soft, blurred gradient of light blue and white, creating a dreamy, ethereal atmosphere.",
+      "samples": [
+        "The image features a large, irregularly shaped purple object positioned centrally against a dark gray background. The object has a somewhat elongated form with a slightly curved top edge and a more angular bottom, giving it an abstract appearance.",
+        "The image features a horizontally elongated, rectangular shape with a gradient of light purple to white, positioned centrally against a dark gray background.",
+        "The image features a horizontally elongated, slightly curved, purple shape that resembles a ribbon or band, positioned centrally against a dark, almost black background. The purple hue is vibrant and contrasts sharply with the deep background, making the shape stand out prominently.",
+        "The image features a horizontally elongated, irregularly shaped object with a gradient of purple hues, transitioning from a lighter shade at the top to a darker shade at the bottom, set against a solid dark blue background."
+      ],
+      "correctness": 0.6682
+    }
+  }
+}
