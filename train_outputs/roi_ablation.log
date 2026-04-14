@@ -1,0 +1,268 @@
+======================================================================
+CORTEXFLOW — ROI ABLATION STUDY
+  Which brain regions drive image reconstruction?
+======================================================================
+
+Loading trained model (baseline)...
+  Model loaded: 23.0M params
+
+Loading brain data + TRIBE v2 projection...
+  V-JEPA features: torch.Size([10000, 2816])
+  PCA V: torch.Size([20484, 384])
+
+======================================================================
+COMPUTING PER-ROI BRAIN PROJECTIONS
+======================================================================
+
+Loading TRIBE v2 for brain projection...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+Projecting 10,000 images to full brain activity...
+  Full brain: torch.Size([10000, 20484])
+  Brain patterns (PCA): torch.Size([10000, 384])
+
+  Per-ROI PCA decomposition (64 dims per ROI):
+    V1_V2       :  2400 vertices →  64 PCA dims (100.0% var) | Early visual cortex
+    V4_IT       :  2400 vertices →  64 PCA dims (100.0% var) | Ventral stream
+    MT_dorsal   :  1600 vertices →  64 PCA dims (100.0% var) | Dorsal stream
+    temporal    :  3200 vertices →  64 PCA dims (100.0% var) | Temporal cortex
+    parietal    :  3400 vertices →  64 PCA dims (100.0% var) | Parietal cortex
+    frontal     :  4600 vertices →  64 PCA dims (100.0% var) | Frontal cortex
+    other       :  2884 vertices →  64 PCA dims (100.0% var) | Other regions
+
+  Total ROI PCA dims: 448
+
+======================================================================
+LOADING IMAGES + CATEGORY LABELS
+======================================================================
+
+Loading images (first 10000)...
+  Images: torch.Size([10000, 3, 128, 128])
+  Loading labeled test set for category analysis...
+  Labeled: torch.Size([8000, 3, 128, 128]), labels: torch.Size([8000])
+  Categories: airplane, bird, car, cat, deer, dog, horse, monkey, ship, truck
+  Caching VAE latents...
+  Latent shape: [8, 16, 16]
+  Fitting ridge regression (baseline)...
+  Extracting features for labeled images via V-JEPA2...
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 280/843 [00:00<00:00, 2784.44it/s]Loading weights:  70%|██████▉   | 588/843 [00:00<00:00, 2942.25it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 3536.44it/s]
+    320/8000 (2s)
+    640/8000 (4s)
+    960/8000 (6s)
+    1280/8000 (8s)
+    1600/8000 (9s)
+    1920/8000 (11s)
+    2240/8000 (13s)
+    2560/8000 (15s)
+    2880/8000 (17s)
+    3200/8000 (18s)
+    3520/8000 (20s)
+    3840/8000 (22s)
+    4160/8000 (24s)
+    4480/8000 (25s)
+    4800/8000 (27s)
+    5120/8000 (29s)
+    5440/8000 (31s)
+    5760/8000 (32s)
+    6080/8000 (34s)
+    6400/8000 (36s)
+    6720/8000 (37s)
+    7040/8000 (39s)
+    7360/8000 (41s)
+    7680/8000 (43s)
+    8000/8000 (44s)
+  Labeled V-JEPA features: torch.Size([8000, 2816])
+  Projecting labeled images through TRIBE v2...
+  Labeled brain patterns: torch.Size([8000, 384])
+
+======================================================================
+ANALYSIS 1: BASELINE — FULL BRAIN RECONSTRUCTION
+======================================================================
+
+  Evaluating baseline (all 384 brain dims, 50 test images)...
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (9s)
+    40/50 (12s)
+    50/50 (15s)
+  Baseline: cos=0.868 ± 0.081, SSIM=0.463 ± 0.211
+
+======================================================================
+ANALYSIS 2: PER-ROI INFORMATION CONTENT
+======================================================================
+
+  Measuring per-ROI variance and category discriminability...
+    V1_V2       : var=    62.4, between=   5.5, discrim=0.088 | Early visual cortex
+    V4_IT       : var=    62.5, between=   5.5, discrim=0.088 | Ventral stream
+    MT_dorsal   : var=    62.4, between=   5.3, discrim=0.085 | Dorsal stream
+    temporal    : var=    62.5, between=   5.5, discrim=0.087 | Temporal cortex
+    parietal    : var=    62.4, between=   5.4, discrim=0.087 | Parietal cortex
+    frontal     : var=    62.5, between=   5.7, discrim=0.091 | Frontal cortex
+    other       : var=    62.3, between=   5.5, discrim=0.088 | Other regions
+
+======================================================================
+ANALYSIS 3: ROI ABLATION (ZERO-MASKING)
+======================================================================
+
+  Computing per-ROI contribution to PCA dimensions...
+
+  Ablating V1_V2 (Early visual cortex, vertices 0-2400)...
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (9s)
+    40/50 (12s)
+    50/50 (15s)
+  V1_V2: cos=0.879 (Δ=-0.011), SSIM=0.381 (Δ=+0.083), PCA distortion cos=0.157
+
+  Ablating V4_IT (Ventral stream, vertices 2400-4800)...
+    10/50 (4s)
+    20/50 (7s)
+    30/50 (10s)
+    40/50 (14s)
+    50/50 (17s)
+  V4_IT: cos=0.857 (Δ=+0.011), SSIM=0.318 (Δ=+0.145), PCA distortion cos=0.251
+
+  Ablating MT_dorsal (Dorsal stream, vertices 4800-6400)...
+    10/50 (3s)
+    20/50 (7s)
+    30/50 (10s)
+    40/50 (14s)
+    50/50 (18s)
+  MT_dorsal: cos=0.872 (Δ=-0.004), SSIM=0.357 (Δ=+0.106), PCA distortion cos=0.224
+
+  Ablating temporal (Temporal cortex, vertices 6400-9600)...
+    10/50 (4s)
+    20/50 (7s)
+    30/50 (10s)
+    40/50 (14s)
+    50/50 (18s)
+  temporal: cos=0.866 (Δ=+0.002), SSIM=0.336 (Δ=+0.128), PCA distortion cos=0.169
+
+  Ablating parietal (Parietal cortex, vertices 9600-13000)...
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (9s)
+    40/50 (12s)
+    50/50 (15s)
+  parietal: cos=0.865 (Δ=+0.003), SSIM=0.330 (Δ=+0.134), PCA distortion cos=0.188
+
+  Ablating frontal (Frontal cortex, vertices 13000-17600)...
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (9s)
+    40/50 (12s)
+    50/50 (15s)
+  frontal: cos=0.850 (Δ=+0.018), SSIM=0.322 (Δ=+0.141), PCA distortion cos=0.122
+
+  Ablating other (Other regions, vertices 17600-20484)...
+    10/50 (4s)
+    20/50 (7s)
+    30/50 (10s)
+    40/50 (13s)
+    50/50 (16s)
+  other: cos=0.869 (Δ=-0.001), SSIM=0.350 (Δ=+0.113), PCA distortion cos=0.166
+
+======================================================================
+ANALYSIS 4: CATEGORY-SPECIFIC ROI IMPORTANCE
+======================================================================
+
+  Computing per-category ROI importance via linear reconstruction...
+
+  Baseline per-category linear cos:
+    airplane    : 0.704
+    ship        : 0.678
+    truck       : 0.555
+    deer        : 0.545
+    dog         : 0.507
+    car         : 0.489
+    bird        : 0.484
+    cat         : 0.465
+    horse       : 0.457
+    monkey      : 0.451
+
+  Category-ROI importance (centroid distance from mean):
+  ROI           airpl   bird    car    cat   deer    dog  horse  monke   ship  truck
+  ----------------------------------------------------------------------------------
+  V1_V2          2.86   2.15   2.60   1.67   2.06   1.62   2.13   1.98   2.68   2.14
+  V4_IT          2.84   2.13   2.55   1.67   2.04   1.64   2.15   1.98   2.74   2.19
+  MT_dorsal      2.74   2.05   2.47   1.65   2.07   1.59   2.10   2.05   2.69   2.15
+  temporal       2.82   2.07   2.56   1.64   2.02   1.64   2.13   2.06   2.71   2.18
+  parietal       2.78   2.00   2.60   1.63   2.01   1.63   2.14   2.11   2.67   2.16
+  frontal        2.82   2.18   2.58   1.64   2.08   1.67   2.12   2.07   2.85   2.21
+  other          2.76   2.18   2.55   1.64   2.03   1.66   2.16   2.02   2.68   2.25
+
+======================================================================
+ANALYSIS 5: ROI-AWARE BRAIN ENCODER
+======================================================================
+
+  Building ROIBrainEncoder with 7 regions:
+    V1_V2       : 64 input dims | Early visual cortex
+    V4_IT       : 64 input dims | Ventral stream
+    MT_dorsal   : 64 input dims | Dorsal stream
+    temporal    : 64 input dims | Temporal cortex
+    parietal    : 64 input dims | Parietal cortex
+    frontal     : 64 input dims | Frontal cortex
+    other       : 64 input dims | Other regions
+  Concatenated ROI dims: torch.Size([10000, 448])
+  ROI encoder params: 2,013,696
+
+  Pre-training ROI brain encoder (10000 steps)...
+    ROI enc step 0: loss=5.6022
+    ROI enc step 2000: loss=2.4940
+    ROI enc step 4000: loss=2.4884
+    ROI enc step 6000: loss=2.4325
+    ROI enc step 8000: loss=2.3435
+
+  Fitting ridge regression (ROI-aware)...
+
+  Fine-tuning DiT with ROI encoder (30000 steps)...
+    DiT step 0: loss=3501.0981 (0s, ~2094s left)
+    DiT step 5000: loss=1.2882 (145s, ~725s left)
+    DiT step 10000: loss=1.0560 (291s, ~581s left)
+    DiT step 15000: loss=0.8464 (435s, ~435s left)
+    DiT step 20000: loss=0.6861 (582s, ~291s left)
+    DiT step 25000: loss=0.5941 (728s, ~145s left)
+    DiT step 29999: loss=0.5683 (873s, ~0s left)
+
+  Evaluating ROI-aware model (50 test images)...
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (9s)
+    40/50 (12s)
+    50/50 (15s)
+  ROI-aware: cos=0.858 ± 0.091, SSIM=0.422 ± 0.211
+  vs baseline: Δcos=-0.010
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  Saved: train_outputs/roi_ablation_impact.png
+  Saved: train_outputs/roi_category_importance.png
+  Saved: train_outputs/roi_information_content.png
+
+======================================================================
+SUMMARY — ROI ABLATION STUDY
+======================================================================
+
+  ROIs defined:              7
+  Total cortical vertices:   20484
+  PCA dims per ROI:          64
+  Total ROI PCA dims:        448
+
+  Baseline (flat encoder):   cos=0.868, SSIM=0.463
+  ROI-aware encoder:         cos=0.858, SSIM=0.422
+  ROI improvement:           Δcos=-0.010
+
+  Ablation impact (sorted by cos drop):
+    frontal      (Frontal cortex      ): Δcos=+0.018, ΔSSIM=+0.141, 4600 vertices
+    V4_IT        (Ventral stream      ): Δcos=+0.011, ΔSSIM=+0.145, 2400 vertices
+    parietal     (Parietal cortex     ): Δcos=+0.003, ΔSSIM=+0.134, 3400 vertices
+    temporal     (Temporal cortex     ): Δcos=+0.002, ΔSSIM=+0.128, 3200 vertices
+    other        (Other regions       ): Δcos=-0.001, ΔSSIM=+0.113, 2884 vertices
+    MT_dorsal    (Dorsal stream       ): Δcos=-0.004, ΔSSIM=+0.106, 1600 vertices
+    V1_V2        (Early visual cortex ): Δcos=-0.011, ΔSSIM=+0.083, 2400 vertices
+
+  Most important ROI:        frontal (Δcos=+0.018)
+  Least important ROI:       V1_V2 (Δcos=-0.011)
+
+  Saved: train_outputs/roi_ablation_results.json
