@@ -1,0 +1,176 @@
+======================================================================
+SAMPLING DYNAMICS STUDY
+How do CFG, ODE steps, and brain noise affect brain decoding?
+======================================================================
+
+Loading STL-10 natural images...
+  Images: torch.Size([10000, 3, 128, 128])
+  Loading labeled test set...
+  Labeled: torch.Size([8000, 3, 128, 128]), labels: torch.Size([8000])
+
+Loading V-JEPA2 (ViT-Giant)...
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 281/843 [00:00<00:00, 2799.22it/s]Loading weights:  67%|██████▋   | 561/843 [00:00<00:00, 2743.82it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 3337.65it/s]
+  Extracting features for 10000 unlabeled images...
+    320/10000 (2.2s)
+    640/10000 (4.1s)
+    960/10000 (6.0s)
+    1280/10000 (7.6s)
+    1600/10000 (9.3s)
+    1920/10000 (11.0s)
+    2240/10000 (12.7s)
+    2560/10000 (14.4s)
+    2880/10000 (16.2s)
+    3200/10000 (17.9s)
+    3520/10000 (19.5s)
+    3840/10000 (21.3s)
+    4160/10000 (23.0s)
+    4480/10000 (24.7s)
+    4800/10000 (26.4s)
+    5120/10000 (28.0s)
+    5440/10000 (29.7s)
+    5760/10000 (31.5s)
+    6080/10000 (33.2s)
+    6400/10000 (35.1s)
+    6720/10000 (36.8s)
+    7040/10000 (38.5s)
+    7360/10000 (40.3s)
+    7680/10000 (42.2s)
+    8000/10000 (43.9s)
+    8320/10000 (45.6s)
+    8640/10000 (47.3s)
+    8960/10000 (49.1s)
+    9280/10000 (50.8s)
+    9600/10000 (52.4s)
+    9920/10000 (54.1s)
+    10000/10000 (54.6s)
+  V-JEPA2 features: torch.Size([10000, 2816])
+
+  Extracting features for 8000 labeled images...
+    320/8000 (1.7s)
+    640/8000 (3.3s)
+    960/8000 (5.0s)
+    1280/8000 (6.6s)
+    1600/8000 (8.3s)
+    1920/8000 (9.9s)
+    2240/8000 (11.8s)
+    2560/8000 (13.6s)
+    2880/8000 (15.3s)
+    3200/8000 (17.0s)
+    3520/8000 (18.7s)
+    3840/8000 (20.6s)
+    4160/8000 (22.3s)
+    4480/8000 (24.1s)
+    4800/8000 (25.9s)
+    5120/8000 (27.8s)
+    5440/8000 (29.6s)
+    5760/8000 (31.4s)
+    6080/8000 (33.2s)
+    6400/8000 (35.0s)
+    6720/8000 (37.0s)
+    7040/8000 (38.7s)
+    7360/8000 (40.5s)
+    7680/8000 (42.3s)
+    8000/8000 (44.0s)
+  Labeled V-JEPA2 features: torch.Size([8000, 2816])
+
+Loading TRIBE v2 brain mapping head...
+  Mapping unlabeled images through TRIBE v2...
+  Full brain: torch.Size([10000, 20484])
+  Brain patterns: torch.Size([10000, 384])
+  Labeled brain: torch.Size([8000, 384])
+
+Loading trained cortexflow model...
+  Model loaded: 23.0M params
+  Latent shape: [8, 16, 16]
+  Ready for sampling analysis
+
+======================================================================
+ANALYSIS 1: CFG SCALE SENSITIVITY
+======================================================================
+  CFG=1.00: cos=0.8664±0.0817, SSIM=0.4542±0.2158 (14.5s)
+  CFG=1.25: cos=0.8632±0.0838, SSIM=0.4492±0.2187 (28.7s)
+  CFG=1.50: cos=0.8595±0.0858, SSIM=0.4417±0.2208 (31.2s)
+  CFG=2.00: cos=0.8520±0.0893, SSIM=0.4249±0.2229 (29.5s)
+  CFG=3.00: cos=0.8387±0.0935, SSIM=0.3925±0.2222 (28.7s)
+  CFG=4.00: cos=0.8272±0.0954, SSIM=0.3642±0.2198 (28.7s)
+  CFG=5.00: cos=0.8165±0.0954, SSIM=0.3387±0.2167 (28.8s)
+  CFG=7.00: cos=0.7948±0.0952, SSIM=0.2924±0.2132 (31.0s)
+
+  → Optimal CFG scale: 1.0 (cos=0.8664)
+
+======================================================================
+ANALYSIS 2: ODE STEP EFFICIENCY
+======================================================================
+  Steps=  5: cos=0.8691±0.0800, SSIM=0.4610±0.2134, 0.088s/sample (4.4s)
+  Steps= 10: cos=0.8675±0.0809, SSIM=0.4572±0.2148, 0.145s/sample (7.2s)
+  Steps= 15: cos=0.8669±0.0813, SSIM=0.4556±0.2154, 0.214s/sample (10.7s)
+  Steps= 20: cos=0.8666±0.0815, SSIM=0.4547±0.2156, 0.242s/sample (12.1s)
+  Steps= 25: cos=0.8664±0.0817, SSIM=0.4542±0.2158, 0.323s/sample (16.2s)
+  Steps= 50: cos=0.8659±0.0819, SSIM=0.4530±0.2162, 0.559s/sample (28.0s)
+  Steps= 75: cos=0.8658±0.0820, SSIM=0.4526±0.2163, 0.851s/sample (42.6s)
+  Steps=100: cos=0.8657±0.0821, SSIM=0.4523±0.2163, 1.122s/sample (56.1s)
+
+  → 99% of max quality at 5 steps (speedup: 12.8×)
+
+======================================================================
+ANALYSIS 3: BRAIN NOISE — QUALITY VS DIVERSITY TRADEOFF
+======================================================================
+  noise=0.00: cos=0.8664, SSIM=0.4542, diversity=0.0640±0.0400 (36.7s)
+  noise=0.05: cos=0.8710, SSIM=0.4536, diversity=0.1065±0.0612 (38.8s)
+  noise=0.10: cos=0.8568, SSIM=0.3844, diversity=0.1240±0.0665 (43.2s)
+  noise=0.20: cos=0.7137, SSIM=0.2359, diversity=0.2971±0.1072 (37.0s)
+  noise=0.30: cos=0.5596, SSIM=0.0782, diversity=0.3723±0.0680 (38.4s)
+  noise=0.50: cos=0.5227, SSIM=0.0555, diversity=0.2933±0.0683 (42.2s)
+  noise=0.75: cos=0.5199, SSIM=0.0537, diversity=0.2376±0.0774 (36.6s)
+  noise=1.00: cos=0.5196, SSIM=0.0539, diversity=0.2051±0.0714 (39.2s)
+
+======================================================================
+ANALYSIS 4: PER-CATEGORY CFG SENSITIVITY
+======================================================================
+  airplane: best CFG=1.0 (cos=0.9565)
+      bird: best CFG=1.0 (cos=0.8717)
+       car: best CFG=1.0 (cos=0.8925)
+       cat: best CFG=1.0 (cos=0.8442)
+      deer: best CFG=1.0 (cos=0.8876)
+       dog: best CFG=1.0 (cos=0.8869)
+     horse: best CFG=1.0 (cos=0.8864)
+    monkey: best CFG=1.0 (cos=0.8763)
+      ship: best CFG=1.0 (cos=0.9366)
+     truck: best CFG=1.0 (cos=0.8848)
+
+======================================================================
+SUMMARY
+======================================================================
+
+  Optimal CFG scale: 1.0
+  Cos at optimal CFG: 0.8664
+  Cos at CFG=1.0 (no guidance): 0.8664
+  CFG improvement: +0.0000
+
+  Min steps for 99% quality: 5
+  Speed at 5 steps: 0.088s/sample
+  Speed at 100 steps: 1.122s/sample
+
+  Brain noise diversity:
+    noise=0.0: quality=0.8664, diversity=0.0640
+    noise=0.3: quality=0.5596, diversity=0.3723
+
+  Results saved to train_outputs/sampling_dynamics_results.json
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  → cfg_sensitivity.png
+  → step_efficiency.png
+  → diversity_tradeoff.png
+  → category_cfg_sensitivity.png
+
+======================================================================
+SAMPLING DYNAMICS STUDY COMPLETE
+======================================================================
+
+Key findings:
+  1. Optimal CFG: 1.0 (improvement over no guidance: +0.0000 cos)
+  2. Min ODE steps for 99% quality: 5 (0.088s vs 1.122s at 100 steps)
+  3. Brain noise σ=0.0: div=0.0640, cos=0.8664
+     Brain noise σ=0.3: div=0.3723, cos=0.5596

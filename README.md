@@ -534,6 +534,61 @@ CUDA_VISIBLE_DEVICES=0 python cross_subject_study.py
 CUDA_VISIBLE_DEVICES=0 python roi_ablation_study.py
 ```
 
+### Sampling Dynamics — Why Brain Decoding Breaks the Rules
+
+Standard text-to-image diffusion uses CFG scales of 5–10 and 20–50 ODE steps. Cortexflow's residual rectified flow regime operates in a fundamentally different regime: the DiT predicts a small correction to a linear baseline, so the dynamics converge near-instantly and guidance *overshoots*. This study systematically characterizes the sampling landscape across four dimensions.
+
+**Analysis 1 — CFG sensitivity** (8 scales, 50 test images):
+
+| CFG Scale | Cosine Similarity | SSIM | Δ from Optimal |
+|-----------|-------------------|------|----------------|
+| **1.0** | **0.866** | **0.454** | — |
+| 1.25 | 0.863 | 0.449 | −0.003 |
+| 1.5 | 0.860 | 0.442 | −0.007 |
+| 2.0 | 0.852 | 0.425 | −0.014 |
+| 3.0 | 0.839 | 0.392 | −0.028 |
+| 5.0 | 0.817 | 0.339 | −0.050 |
+| 7.0 | 0.795 | 0.292 | −0.072 |
+
+**Key finding**: CFG=1.0 (no guidance) is optimal. Classifier-free guidance monotonically degrades both semantic and structural fidelity. In residual mode, the velocity field already captures the brain-specific signal; amplifying it overshoots the target latent.
+
+**Analysis 2 — ODE step efficiency** (8 step counts, 50 test images):
+
+| Steps | Cosine Similarity | Time/Sample | Speedup vs 100 |
+|-------|-------------------|-------------|-----------------|
+| **5** | **0.869** | **88 ms** | **12.8×** |
+| 10 | 0.868 | 145 ms | 7.7× |
+| 25 | 0.866 | 323 ms | 3.5× |
+| 50 | 0.866 | 559 ms | 2.0× |
+| 100 | 0.866 | 1122 ms | 1.0× |
+
+**Key finding**: 5 steps achieves the *highest* quality (cos=0.869) at 88 ms/sample — enabling **11.4 Hz real-time BCI decoding**. Quality marginally *decreases* with more steps (numerical drift on the near-trivial residual ODE). Rectified flow's straight-line trajectories converge in fewer steps than diffusion models.
+
+**Analysis 3 — Brain noise diversity tradeoff** (8 noise levels):
+
+| Noise σ | Quality (cos) | Diversity | Quality Retained |
+|---------|---------------|-----------|-----------------|
+| 0.00 | 0.866 | 0.064 | 100% |
+| **0.05** | **0.871** | **0.107** | **100.5%** |
+| 0.10 | 0.857 | 0.124 | 98.9% |
+| 0.20 | 0.714 | 0.297 | 82.4% |
+| 0.30 | 0.560 | 0.372 | 64.6% |
+
+**Key finding**: σ=0.05 is a "free lunch" — it *improves* quality (+0.5%) while providing 1.67× more diverse reconstructions. This suggests a mild stochastic regularization effect; small noise helps the ODE escape local optima in the residual landscape.
+
+**Analysis 4 — Per-category CFG sensitivity** (10 categories × 5 CFG levels):
+
+CFG=1.0 is universally optimal across **all 10 categories** — no category benefits from guidance. Category difficulty spans 0.844 (cat) to 0.956 (airplane), but the ordering is consistent: man-made objects with distinctive shapes (airplane, ship) are easiest; animals with high intra-class variability (cat, bird) are hardest.
+
+![CFG Sensitivity](train_outputs/cfg_sensitivity.png)
+![ODE Step Efficiency](train_outputs/step_efficiency.png)
+![Brain Noise Diversity Tradeoff](train_outputs/diversity_tradeoff.png)
+![Per-Category CFG Sensitivity](train_outputs/category_cfg_sensitivity.png)
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python sampling_dynamics_study.py
+```
+
 ## References
 
 - Peebles & Xie (2022). "Scalable Diffusion Models with Transformers." arXiv:2212.09748
