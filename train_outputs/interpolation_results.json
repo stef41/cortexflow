@@ -1,0 +1,257 @@
+{
+  "experiment": "brain_interpolation",
+  "model": "cortexflow \u00d7 TRIBE v2",
+  "dataset": "STL-10 labeled test",
+  "n_interp_steps": 9,
+  "overall_smoothness": 0.9898,
+  "interpolation": {
+    "cat\u2192dog": {
+      "cat_a": "cat",
+      "cat_b": "dog",
+      "endpoint_brain_cos": -0.032,
+      "mean_frame_cos": 0.9901,
+      "min_frame_cos": 0.9765,
+      "fidelity_a": 0.9116,
+      "fidelity_b": 0.6581,
+      "frame_cos_scores": [
+        0.9978,
+        0.9962,
+        0.9908,
+        0.9853,
+        0.9765,
+        0.9834,
+        0.9883,
+        0.9902,
+        0.9958,
+        0.9971
+      ]
+    },
+    "ship\u2192airplane": {
+      "cat_a": "ship",
+      "cat_b": "airplane",
+      "endpoint_brain_cos": 0.0491,
+      "mean_frame_cos": 0.9973,
+      "min_frame_cos": 0.995,
+      "fidelity_a": 0.901,
+      "fidelity_b": 0.9492,
+      "frame_cos_scores": [
+        0.9983,
+        0.9982,
+        0.998,
+        0.9977,
+        0.9968,
+        0.995,
+        0.9956,
+        0.9973,
+        0.9974,
+        0.9987
+      ]
+    },
+    "monkey\u2192ship": {
+      "cat_a": "monkey",
+      "cat_b": "ship",
+      "endpoint_brain_cos": -0.005,
+      "mean_frame_cos": 0.9832,
+      "min_frame_cos": 0.9529,
+      "fidelity_a": 0.8144,
+      "fidelity_b": 0.901,
+      "frame_cos_scores": [
+        0.9956,
+        0.9931,
+        0.9815,
+        0.9637,
+        0.9529,
+        0.9733,
+        0.9834,
+        0.9937,
+        0.9961,
+        0.9982
+      ]
+    },
+    "horse\u2192car": {
+      "cat_a": "horse",
+      "cat_b": "car",
+      "endpoint_brain_cos": -0.0549,
+      "mean_frame_cos": 0.9831,
+      "min_frame_cos": 0.9611,
+      "fidelity_a": 0.9104,
+      "fidelity_b": 0.8346,
+      "frame_cos_scores": [
+        0.9983,
+        0.9959,
+        0.9929,
+        0.9634,
+        0.9806,
+        0.9801,
+        0.9824,
+        0.9858,
+        0.9906,
+        0.9611
+      ]
+    },
+    "bird\u2192airplane": {
+      "cat_a": "bird",
+      "cat_b": "airplane",
+      "endpoint_brain_cos": -0.0032,
+      "mean_frame_cos": 0.9954,
+      "min_frame_cos": 0.9881,
+      "fidelity_a": 0.9355,
+      "fidelity_b": 0.9492,
+      "frame_cos_scores": [
+        0.998,
+        0.9972,
+        0.9958,
+        0.9884,
+        0.9881,
+        0.9949,
+        0.9967,
+        0.9976,
+        0.9983,
+        0.9987
+      ]
+    }
+  },
+  "arithmetic": {
+    "cat \u2212 animal + vehicle": {
+      "nearest_category": "cat",
+      "nearest_similarity": 0.7102,
+      "all_similarities": {
+        "airplane": 0.2443,
+        "bird": -0.2659,
+        "car": 0.2361,
+        "cat": 0.7102,
+        "deer": -0.1906,
+        "dog": -0.1088,
+        "horse": -0.2642,
+        "monkey": -0.2051,
+        "ship": 0.3263,
+        "truck": 0.3004
+      }
+    },
+    "ship \u2212 vehicle + animal": {
+      "nearest_category": "ship",
+      "nearest_similarity": 0.7652,
+      "all_similarities": {
+        "airplane": -0.2698,
+        "bird": 0.1481,
+        "car": -0.3572,
+        "cat": 0.1748,
+        "deer": 0.1304,
+        "dog": 0.094,
+        "horse": 0.1176,
+        "monkey": 0.1146,
+        "ship": 0.7652,
+        "truck": -0.2756
+      }
+    },
+    "horse \u2212 animal + vehicle": {
+      "nearest_category": "horse",
+      "nearest_similarity": 1.0,
+      "all_similarities": {
+        "airplane": -0.036,
+        "bird": -0.0367,
+        "car": -0.0774,
+        "cat": -0.0816,
+        "deer": 0.0099,
+        "dog": 0.02,
+        "horse": 1.0,
+        "monkey": -0.0787,
+        "ship": -0.0644,
+        "truck": -0.0828
+      }
+    },
+    "airplane \u2212 vehicle + animal": {
+      "nearest_category": "airplane",
+      "nearest_similarity": 0.7669,
+      "all_similarities": {
+        "airplane": 0.7669,
+        "bird": 0.1944,
+        "car": -0.3568,
+        "cat": 0.1393,
+        "deer": 0.1514,
+        "dog": 0.146,
+        "horse": 0.1433,
+        "monkey": 0.1596,
+        "ship": -0.313,
+        "truck": -0.3589
+      }
+    },
+    "dog + (ship \u2212 car)": {
+      "nearest_category": "ship",
+      "nearest_similarity": 0.6368,
+      "all_similarities": {
+        "airplane": 0.0237,
+        "bird": -0.035,
+        "car": -0.6913,
+        "cat": 0.0845,
+        "deer": 0.01,
+        "dog": 0.372,
+        "horse": 0.0146,
+        "monkey": -0.0315,
+        "ship": 0.6368,
+        "truck": -0.0276
+      }
+    },
+    "bird + (airplane \u2212 bird)": {
+      "nearest_category": "bird",
+      "nearest_similarity": 0.7146,
+      "all_similarities": {
+        "airplane": 0.6948,
+        "bird": 0.7146,
+        "car": -0.0373,
+        "cat": -0.0816,
+        "deer": -0.0414,
+        "dog": -0.0421,
+        "horse": -0.0515,
+        "monkey": -0.0293,
+        "ship": -0.0248,
+        "truck": -0.0789
+      }
+    }
+  },
+  "dimension_sensitivity": {
+    "PC1": {
+      "sensitivity": 0.0413
+    },
+    "PC2": {
+      "sensitivity": 0.0269
+    },
+    "PC3": {
+      "sensitivity": 0.0132
+    },
+    "PC4": {
+      "sensitivity": 0.0377
+    },
+    "PC5": {
+      "sensitivity": 0.0115
+    }
+  },
+  "extrapolation": {
+    "pair": [
+      "cat",
+      "ship"
+    ],
+    "alphas": [
+      -0.5,
+      -0.25,
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5
+    ],
+    "brain_norms": [
+      23.959,
+      19.272,
+      15.085,
+      11.936,
+      10.778,
+      12.192,
+      15.489,
+      19.747,
+      24.47
+    ]
+  }
+}

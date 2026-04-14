@@ -1,0 +1,186 @@
+======================================================================
+BRAIN SPACE INTERPOLATION & MANIPULATION STUDY
+======================================================================
+
+Loading saved model...
+  Model: 23.0M params
+Loading TRIBE v2 brain mapping head...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Re-deriving ridge regression...
+  Encoding training images through VAE...
+  Latent shape: [8, 16, 16]
+  Ridge regression fitted (lambda=5.0)
+
+Loading labeled test set...
+  Test brain patterns: torch.Size([8000, 384]) (cached)
+
+Computing category centroids and selecting exemplars...
+    airplane: centroid norm=4.196, exemplar idx=5941
+        bird: centroid norm=4.314, exemplar idx=6076
+         car: centroid norm=4.141, exemplar idx=3016
+         cat: centroid norm=3.504, exemplar idx=2505
+        deer: centroid norm=3.214, exemplar idx=2818
+         dog: centroid norm=2.465, exemplar idx=4710
+       horse: centroid norm=3.400, exemplar idx=25
+      monkey: centroid norm=3.647, exemplar idx=6673
+        ship: centroid norm=4.271, exemplar idx=388
+       truck: centroid norm=3.852, exemplar idx=6810
+
+  Animal mean norm: 1.369
+  Vehicle mean norm: 2.042
+  Animal↔Vehicle cosine: -0.326
+
+======================================================================
+CROSS-CATEGORY INTERPOLATION (5 pairs × 11 steps)
+======================================================================
+
+  [1/5] cat→dog
+    Brain distance: cos=-0.032
+    Smoothness: mean_cos=0.990, min_cos=0.976
+    Fidelity: A=0.912, B=0.658  (13s)
+
+  [2/5] ship→airplane
+    Brain distance: cos=0.049
+    Smoothness: mean_cos=0.997, min_cos=0.995
+    Fidelity: A=0.901, B=0.949  (26s)
+
+  [3/5] monkey→ship
+    Brain distance: cos=-0.005
+    Smoothness: mean_cos=0.983, min_cos=0.953
+    Fidelity: A=0.814, B=0.901  (39s)
+
+  [4/5] horse→car
+    Brain distance: cos=-0.055
+    Smoothness: mean_cos=0.983, min_cos=0.961
+    Fidelity: A=0.910, B=0.835  (52s)
+
+  [5/5] bird→airplane
+    Brain distance: cos=-0.003
+    Smoothness: mean_cos=0.995, min_cos=0.988
+    Fidelity: A=0.935, B=0.949  (65s)
+
+======================================================================
+BRAIN ARITHMETIC
+======================================================================
+
+  [1/6] cat − animal + vehicle
+    Nearest category: cat (cos=0.710)
+    Top-3: cat=0.710, ship=0.326, truck=0.300
+    (1s)
+
+  [2/6] ship − vehicle + animal
+    Nearest category: ship (cos=0.765)
+    Top-3: ship=0.765, cat=0.175, bird=0.148
+    (2s)
+
+  [3/6] horse − animal + vehicle
+    Nearest category: horse (cos=1.000)
+    Top-3: horse=1.000, dog=0.020, deer=0.010
+    (3s)
+
+  [4/6] airplane − vehicle + animal
+    Nearest category: airplane (cos=0.767)
+    Top-3: airplane=0.767, bird=0.194, monkey=0.160
+    (5s)
+
+  [5/6] dog + (ship − car)
+    Nearest category: ship (cos=0.637)
+    Top-3: ship=0.637, dog=0.372, cat=0.085
+    (6s)
+
+  [6/6] bird + (airplane − bird)
+    Nearest category: bird (cos=0.715)
+    Top-3: bird=0.715, airplane=0.695, ship=-0.025
+    (7s)
+
+======================================================================
+TARGETED DIMENSION MANIPULATION
+======================================================================
+
+  Dimension PC1 (base=1.760)
+    Sensitivity (1-cos at ±2σ): 0.0413  (6s)
+
+  Dimension PC2 (base=-0.599)
+    Sensitivity (1-cos at ±2σ): 0.0269  (13s)
+
+  Dimension PC3 (base=-0.090)
+    Sensitivity (1-cos at ±2σ): 0.0132  (19s)
+
+  Dimension PC4 (base=0.081)
+    Sensitivity (1-cos at ±2σ): 0.0377  (25s)
+
+  Dimension PC5 (base=-0.547)
+    Sensitivity (1-cos at ±2σ): 0.0115  (31s)
+
+======================================================================
+EXTRAPOLATION — BEYOND TRAINING DISTRIBUTION
+======================================================================
+  α=-0.50  brain_norm=23.96
+  α=-0.25  brain_norm=19.27
+  α=+0.00  brain_norm=15.08
+  α=+0.25  brain_norm=11.94
+  α=+0.50  brain_norm=10.78
+  α=+0.75  brain_norm=12.19
+  α=+1.00  brain_norm=15.49
+  α=+1.25  brain_norm=19.75
+  α=+1.50  brain_norm=24.47
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  Saved: train_outputs/brain_interpolation.png
+  Saved: train_outputs/brain_arithmetic.png
+  Saved: train_outputs/brain_dimensions.png
+  Saved: train_outputs/brain_extrapolation.png
+  Saved: train_outputs/brain_smoothness.png
+
+======================================================================
+SUMMARY — BRAIN SPACE INTERPOLATION & MANIPULATION STUDY
+======================================================================
+
+  Interpolation (cross-category):
+                      cat→dog: smoothness=0.990  brain_cos=-0.032
+                ship→airplane: smoothness=0.997  brain_cos=0.049
+                  monkey→ship: smoothness=0.983  brain_cos=-0.005
+                    horse→car: smoothness=0.983  brain_cos=-0.055
+                bird→airplane: smoothness=0.995  brain_cos=-0.003
+                      OVERALL: 0.990
+
+  Brain Arithmetic:
+                 cat − animal + vehicle →        cat (cos=0.710)
+                ship − vehicle + animal →       ship (cos=0.765)
+               horse − animal + vehicle →      horse (cos=1.000)
+            airplane − vehicle + animal →   airplane (cos=0.767)
+                     dog + (ship − car) →       ship (cos=0.637)
+               bird + (airplane − bird) →       bird (cos=0.715)
+
+  Dimension Sensitivity (ship exemplar):
+    PC1: sensitivity=0.0413
+    PC2: sensitivity=0.0269
+    PC3: sensitivity=0.0132
+    PC4: sensitivity=0.0377
+    PC5: sensitivity=0.0115
+
+  Extrapolation (bird→airplane):
+    α=-0.50: brain_norm=23.96 ⚠
+    α=-0.25: brain_norm=19.27 ⚠
+    α=+0.00: brain_norm=15.08 ✓
+    α=+0.25: brain_norm=11.94 ✓
+    α=+0.50: brain_norm=10.78 ✓
+    α=+0.75: brain_norm=12.19 ✓
+    α=+1.00: brain_norm=15.49 ✓
+    α=+1.25: brain_norm=19.75 ⚠
+    α=+1.50: brain_norm=24.47 ⚠
+
+  Saved: train_outputs/interpolation_results.json
+
+  Figures:
+    train_outputs/brain_interpolation.png  — cross-category interpolation grid
+    train_outputs/brain_arithmetic.png     — semantic arithmetic results
+    train_outputs/brain_dimensions.png     — per-dimension manipulation
+    train_outputs/brain_extrapolation.png  — extrapolation beyond training distribution
+    train_outputs/brain_smoothness.png     — interpolation smoothness analysis
+
+======================================================================
+DONE
+======================================================================
