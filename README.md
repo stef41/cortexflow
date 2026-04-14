@@ -365,6 +365,48 @@ Key finding: the **nonlinear benefit of DiT is larger for natural images** (+0.0
 CUDA_VISIBLE_DEVICES=0 python train_natural.py
 ```
 
+### Category-Level Brain Decoding Analysis
+
+`category_analysis.py` evaluates the trained natural-image model on STL-10's **labeled test set** (8,000 images, 10 categories), revealing what TRIBE v2's predicted brain activity encodes about visual semantics.
+
+**Brain representation structure:**
+
+| Metric | Value |
+|--------|-------|
+| **kNN classification from brain patterns** | **71.0%** (chance=10%) |
+| Silhouette score | -0.021 |
+| Most similar categories | cat ↔ dog (0.108) |
+| Most dissimilar categories | monkey ↔ ship (-0.108) |
+
+**Per-category reconstruction quality (ranked by SSIM):**
+
+| Category | Cosine | SSIM | DiT gap (SSIM) |
+|----------|:------:|:----:|:--------------:|
+| ship | 0.942 | **0.694** | +0.074 |
+| truck | 0.875 | 0.588 | +0.083 |
+| airplane | 0.948 | 0.569 | +0.111 |
+| car | 0.861 | 0.533 | +0.060 |
+| horse | 0.874 | 0.463 | **+0.140** |
+| deer | 0.915 | 0.451 | +0.111 |
+| dog | 0.890 | 0.447 | +0.077 |
+| cat | 0.891 | 0.406 | +0.074 |
+| bird | 0.890 | 0.361 | +0.072 |
+| monkey | 0.869 | 0.348 | +0.109 |
+
+**Key findings:**
+- **Rigid objects decoded best** (ship, truck, airplane) — uniform textures and simple shapes are easier to reconstruct
+- **Animals decoded worst** (monkey, bird, cat) — complex fur/feather textures and pose variation are harder
+- **DiT advantage largest for horse** (+0.140 SSIM) — categories where linear regression fails most benefit most from the nonlinear DiT
+- **Cat and dog share the most similar brain representations** (cosine=0.108), consistent with their visual similarity
+- **128 PCA dimensions capture most visual information** (SSIM=0.357 vs 0.424 at 384 — diminishing returns)
+- **71% brain classification accuracy from 384 brain dims alone** — TRIBE v2's predicted activity preserves strong categorical structure
+
+![Category Analysis](train_outputs/category_analysis.png)
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python category_analysis.py
+```
+
 ## References
 
 - Peebles & Xie (2022). "Scalable Diffusion Models with Transformers." arXiv:2212.09748
