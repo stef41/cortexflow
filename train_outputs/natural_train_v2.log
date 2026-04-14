@@ -1,0 +1,271 @@
+======================================================================
+CORTEXFLOW × TRIBE v2 — NATURAL IMAGE RECONSTRUCTION
+======================================================================
+
+Loading STL-10 natural images...
+  STL-10 unlabeled: 100000 images
+  Loaded 100000 images in 4.5s: torch.Size([100000, 3, 128, 128])
+  Selected 100000 images: torch.Size([100000, 3, 128, 128])
+  Value range: [0.000, 1.000]
+
+Loading V-JEPA2 (ViT-Giant, pretrained)...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  28%|██▊       | 236/843 [00:00<00:00, 2347.08it/s]Loading weights:  62%|██████▏   | 522/843 [00:00<00:00, 2609.43it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 3056.02it/s]
+  V-JEPA2: 1035M params
+
+Extracting features from 100000 images...
+    1600/100000 (11.0s)
+    3200/100000 (21.6s)
+    4800/100000 (32.2s)
+    6400/100000 (42.7s)
+    8000/100000 (53.4s)
+    9600/100000 (64.0s)
+    11200/100000 (74.7s)
+    12800/100000 (85.2s)
+    14400/100000 (95.8s)
+    16000/100000 (106.5s)
+    17600/100000 (117.1s)
+    19200/100000 (127.8s)
+    20800/100000 (138.4s)
+    22400/100000 (149.0s)
+    24000/100000 (159.7s)
+    25600/100000 (170.4s)
+    27200/100000 (181.0s)
+    28800/100000 (191.5s)
+    30400/100000 (202.2s)
+    32000/100000 (212.9s)
+    33600/100000 (223.5s)
+    35200/100000 (234.3s)
+    36800/100000 (244.9s)
+    38400/100000 (255.6s)
+    40000/100000 (266.3s)
+    41600/100000 (277.0s)
+    43200/100000 (287.7s)
+    44800/100000 (298.4s)
+    46400/100000 (309.1s)
+    48000/100000 (319.8s)
+    49600/100000 (330.5s)
+    51200/100000 (341.1s)
+    52800/100000 (351.8s)
+    54400/100000 (362.4s)
+    56000/100000 (373.1s)
+    57600/100000 (383.8s)
+    59200/100000 (394.4s)
+    60800/100000 (405.3s)
+    62400/100000 (416.1s)
+    64000/100000 (426.9s)
+    65600/100000 (437.7s)
+    67200/100000 (448.5s)
+    68800/100000 (459.4s)
+    70400/100000 (470.3s)
+    72000/100000 (481.2s)
+    73600/100000 (492.0s)
+    75200/100000 (502.8s)
+    76800/100000 (513.7s)
+    78400/100000 (524.4s)
+    80000/100000 (535.2s)
+    81600/100000 (546.1s)
+    83200/100000 (556.9s)
+    84800/100000 (567.7s)
+    86400/100000 (578.6s)
+    88000/100000 (589.5s)
+    89600/100000 (600.1s)
+    91200/100000 (610.3s)
+    92800/100000 (620.9s)
+    94400/100000 (631.5s)
+    96000/100000 (642.1s)
+    97600/100000 (652.7s)
+    99200/100000 (663.4s)
+    100000/100000 (668.8s)
+  V-JEPA2 features: torch.Size([100000, 2816])
+
+Loading TRIBE v2 brain mapping head...
+  Video projector: torch.Size([384, 2816])
+  Brain predictor: torch.Size([1, 2048, 20484]) → 20484 cortical vertices
+
+Projecting 100000 images through TRIBE v2 brain mapping...
+    10000/100000 (3s)
+    20000/100000 (5s)
+    30000/100000 (7s)
+    40000/100000 (9s)
+    50000/100000 (12s)
+    60000/100000 (13s)
+    70000/100000 (16s)
+    80000/100000 (18s)
+    90000/100000 (20s)
+    100000/100000 (23s)
+  Full brain activity: torch.Size([100000, 20484])
+  Brain range: [-40.565, 29.463]
+  Brain std: 3.9079
+
+  PCA: 20484 → 384 dimensions...
+  Brain patterns: torch.Size([100000, 384])
+  Variance explained: 100.0%
+
+  Train: 90000, Test: 10000
+
+======================================================================
+TRAINING CORTEXFLOW ON NATURAL IMAGES
+======================================================================
+  Model params: 63.3M
+
+  Pre-training VAE (15000 steps)...
+    VAE step 0: loss=0.3770 (0s)
+    VAE step 1000: loss=0.0038 (44s)
+    VAE step 2000: loss=0.0018 (88s)
+    VAE step 3000: loss=0.0016 (132s)
+    VAE step 4000: loss=0.0017 (176s)
+    VAE step 5000: loss=0.0014 (220s)
+    VAE step 6000: loss=0.0014 (264s)
+    VAE step 7000: loss=0.0013 (308s)
+    VAE step 8000: loss=0.0013 (352s)
+    VAE step 9000: loss=0.0012 (396s)
+    VAE step 10000: loss=0.0012 (440s)
+    VAE step 11000: loss=0.0010 (484s)
+    VAE step 12000: loss=0.0010 (527s)
+    VAE step 13000: loss=0.0012 (571s)
+    VAE step 14000: loss=0.0012 (615s)
+  Caching latents for 100000 images...
+    40000/100000 (3s)
+    80000/100000 (7s)
+    100000/100000 (8s)
+  Latent shape: [8, 16, 16]
+  VAE reconstruction SSIM (ceiling): 0.988 ± 0.010
+
+  Pre-training brain encoder (20000 steps)...
+    Brain enc step 0: loss=2.9441
+    Brain enc step 2000: loss=1.2590
+    Brain enc step 4000: loss=1.1637
+    Brain enc step 6000: loss=1.1349
+    Brain enc step 8000: loss=1.2113
+    Brain enc step 10000: loss=1.1092
+    Brain enc step 12000: loss=1.0936
+    Brain enc step 14000: loss=1.1505
+    Brain enc step 16000: loss=1.0910
+    Brain enc step 18000: loss=1.1483
+
+  Fitting linear predictor (ridge regression)...
+  Linear baseline — train cos: 0.477, test cos: 0.469
+
+  Training DiT (150000 steps, residual mode, EMA)...
+    DiT step 0: loss=2.9504 (0s, ~18959s left)
+    DiT step 15000: loss=1.2869 (1385s, ~12468s left)
+    DiT step 30000: loss=1.2585 (2769s, ~11076s left)
+    DiT step 45000: loss=1.2356 (4151s, ~9686s left)
+    DiT step 60000: loss=1.2183 (5532s, ~8298s left)
+    DiT step 75000: loss=1.1981 (6911s, ~6910s left)
+    DiT step 90000: loss=1.1797 (8282s, ~5521s left)
+    DiT step 105000: loss=1.1547 (9666s, ~4142s left)
+    DiT step 120000: loss=1.1354 (11051s, ~2763s left)
+    DiT step 135000: loss=1.1234 (12430s, ~1381s left)
+    DiT step 149999: loss=1.1208 (13805s, ~0s left)
+
+======================================================================
+EVALUATION ON HELD-OUT NATURAL IMAGES
+======================================================================
+
+  Train set (first 8):
+    cos=0.958, SSIM=0.744
+
+  Test set (200 held-out natural images):
+    cos=0.911 ± 0.056
+    SSIM=0.587 ± 0.195
+
+  Linear baseline test cos: 0.860, SSIM: 0.469
+  DiT gap — cos: +0.051, SSIM: +0.118
+
+======================================================================
+VLM SEMANTIC EVALUATION (Qwen2.5-VL-7B)
+======================================================================
+  Loading Qwen2.5-VL-7B for captioning...
+Fetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]Fetching 5 files: 100%|██████████| 5/5 [00:00<00:00, 67869.00it/s]
+Loading weights:   0%|          | 0/729 [00:00<?, ?it/s]Loading weights:   0%|          | 1/729 [00:00<01:21,  8.93it/s]Loading weights:   1%|▏         | 10/729 [00:00<00:13, 54.14it/s]Loading weights:   3%|▎         | 22/729 [00:00<00:08, 81.43it/s]Loading weights:   5%|▍         | 36/729 [00:00<00:06, 101.96it/s]Loading weights:   6%|▋         | 47/729 [00:00<00:06, 103.24it/s]Loading weights:   9%|▉         | 64/729 [00:00<00:05, 116.38it/s]Loading weights:  10%|█         | 76/729 [00:00<00:05, 115.57it/s]Loading weights:  12%|█▏        | 88/729 [00:00<00:05, 110.73it/s]Loading weights:  14%|█▎        | 100/729 [00:01<00:05, 104.88it/s]Loading weights:  16%|█▋        | 120/729 [00:01<00:04, 130.82it/s]Loading weights:  19%|█▊        | 136/729 [00:01<00:04, 130.12it/s]Loading weights:  21%|██        | 150/729 [00:01<00:04, 117.92it/s]Loading weights:  23%|██▎       | 167/729 [00:01<00:04, 131.30it/s]Loading weights:  25%|██▌       | 184/729 [00:01<00:04, 121.73it/s]Loading weights:  27%|██▋       | 197/729 [00:01<00:04, 122.40it/s]Loading weights:  29%|██▉       | 210/729 [00:01<00:04, 116.28it/s]Loading weights:  31%|███▏      | 228/729 [00:01<00:03, 131.97it/s]Loading weights:  33%|███▎      | 244/729 [00:02<00:04, 115.84it/s]Loading weights:  36%|███▌      | 264/729 [00:02<00:03, 134.62it/s]Loading weights:  38%|███▊      | 280/729 [00:02<00:03, 125.19it/s]Loading weights:  40%|████      | 294/729 [00:02<00:03, 123.15it/s]Loading weights:  43%|████▎     | 312/729 [00:02<00:03, 135.98it/s]Loading weights:  45%|████▍     | 327/729 [00:02<00:03, 132.79it/s]Loading weights:  54%|█████▎    | 391/729 [00:02<00:01, 264.65it/s]Loading weights:  74%|███████▎  | 536/729 [00:02<00:00, 584.03it/s]Loading weights:  93%|█████████▎| 681/729 [00:03<00:00, 821.10it/s]Loading weights: 100%|██████████| 729/729 [00:03<00:00, 235.54it/s]
+The image processor of type `Qwen2VLImageProcessor` is now loaded as a fast processor by default, even if the model checkpoint was saved with a slow processor. This is a breaking change and may produce slightly different outputs. To continue using the slow processor, instantiate this class with `use_fast=False`. 
+
+  Captioning 20 target + reconstruction pairs...
+The following generation flags are not valid and may be ignored: ['temperature']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+    5/20 done (22s)
+    10/20 done (41s)
+    15/20 done (60s)
+    20/20 done (80s)
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 8179.44it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+[3mNotes:
+- UNEXPECTED[3m	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.[0m
+
+  VLM Results:
+    Semantic correctness: 0.654 ± 0.131
+    Inter-brain diversity: 0.405
+
+  Example captions:
+
+    Test 90000:
+      TARGET: The image features a close-up of a human skull against a stark black background, highlighting its pale bone structure wi
+      RECON:  The image features a close-up of a dog's face, with a blurred effect that obscures fine details but hints at warm, earth
+      SIM:    0.609
+
+    Test 90001:
+      TARGET: The image features a Doberman Pinscher standing alertly in a well-lit indoor setting, with its sleek black coat accented
+      RECON:  The image depicts a dark-colored dog with a shaggy coat standing against a textured, light-colored wall. The dog's fur a
+      SIM:    0.805
+
+    Test 90002:
+      TARGET: The image features a lizard perched on a rugged, textured rock formation, with its body blending subtly into the earthy 
+      RECON:  The image depicts a lion lying down on a log, with its head resting on its front paws, surrounded by a dark, possibly fo
+      SIM:    0.445
+
+    Test 90003:
+      TARGET: The image captures a dynamic moment of a bobsledder in action, wearing a red jacket with black pants and a white helmet,
+      RECON:  The image features a close-up of a red and black object with a textured surface, possibly a tool or piece of machinery, 
+      SIM:    0.490
+
+    Test 90004:
+      TARGET: The image features a close-up of a dark brown antelope with a lighter underbelly, standing amidst dry, golden-brown gras
+      RECON:  The image features a deer with prominent antlers as the central subject, standing against a blurred background of earthy
+      SIM:    0.773
+
+  Saved: train_outputs/natural_reconstructions.png
+
+======================================================================
+DIVERSITY: 4 SAMPLES PER BRAIN
+======================================================================
+  Brain 90000: intra-diversity=0.092
+  Brain 90001: intra-diversity=0.029
+  Brain 90002: intra-diversity=0.082
+  Brain 90003: intra-diversity=0.031
+  Brain 90004: intra-diversity=0.023
+  Brain 90005: intra-diversity=0.027
+
+  Mean intra-brain diversity: 0.047
+  Saved: train_outputs/natural_diversity.png
+
+======================================================================
+SUMMARY — NATURAL IMAGE RECONSTRUCTION
+======================================================================
+
+  Dataset:            STL-10 (real photographs)
+  Forward model:      TRIBE v2 (Meta, pretrained on 1000+ hrs fMRI)
+  Feature extractor:  V-JEPA2 ViT-Giant (pretrained, 1035M params)
+  Brain vertices:     20,484 (fsaverage5) → PCA to 384
+  Image size:         128×128
+  Samples:            90000 train / 10000 test
+  
+  ┌──────────────────────────┬───────────────────┐
+  │ Metric                   │ Value              │
+  ├──────────────────────────┼───────────────────┤
+  │ Test cosine similarity   │ 0.911 ± 0.056       │
+  │ Test SSIM                │ 0.587 ± 0.195       │
+  │ Linear baseline cos      │ 0.860              │
+  │ Linear baseline SSIM     │ 0.469              │
+  │ DiT gap (cos)            │ +0.051              │
+  │ DiT gap (SSIM)           │ +0.118              │
+  │ VLM correctness          │ 0.654              │
+  │ VLM inter-brain diversity│ 0.405              │
+  │ Intra-brain diversity    │ 0.047              │
+  └──────────────────────────┴───────────────────┘
+
+  Saved: train_outputs/natural_results.json

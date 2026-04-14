@@ -46,24 +46,24 @@ DEVICE = "cuda:0"
 # ═══════════════════════════════════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════════════════════════════════
-N_TOTAL = 10000
-N_TRAIN = 8000
-N_TEST = 2000
+N_TOTAL = 100000       # ALL STL-10 unlabeled (was 10K)
+N_TRAIN = 90000
+N_TEST = 10000
 IMG_SIZE = 128
 N_VOXELS = 384         # PCA dims (full rank of TRIBE v2 video projector)
 VJEPA_LAYERS = [20, 30]
 
-# Training config — bigger model for 128×128 natural images
-VAE_STEPS = 8000
+# Training config — larger model, more steps for 10x data
+VAE_STEPS = 15000
 VAE_LR = 1e-3
-DIT_STEPS = 60000
-DIT_LR = 1e-3
-BATCH_SIZE = 64
-NOISE_AUGMENT = 0.05
+DIT_STEPS = 150000
+DIT_LR = 5e-4
+BATCH_SIZE = 128
+NOISE_AUGMENT = 0.1
 WEIGHT_DECAY = 0.05
-IMG_CFG_SCALE = 1.5    # slight CFG for sharper outputs
-N_AVG = 4
-BRAIN_PRETRAIN_STEPS = 10000
+IMG_CFG_SCALE = 1.0    # optimal from sampling dynamics study
+N_AVG = 2              # 5-step ODE is so fast, 2 samples suffice
+BRAIN_PRETRAIN_STEPS = 20000
 
 
 def compute_ssim(img1, img2):
@@ -86,17 +86,22 @@ print("CORTEXFLOW × TRIBE v2 — NATURAL IMAGE RECONSTRUCTION")
 print("=" * 70)
 
 print(f"\nLoading STL-10 natural images...")
-transform = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor(),
-])
 
-dataset = STL10("/tmp/stl10", split="unlabeled", download=False, transform=transform)
+dataset = STL10("/tmp/stl10", split="unlabeled", download=False)
 print(f"  STL-10 unlabeled: {len(dataset)} images")
 
-# Sample N_TOTAL random images
-indices = torch.randperm(len(dataset))[:N_TOTAL].tolist()
-target_images = torch.stack([dataset[i][0] for i in indices])
+# Fast load: use raw numpy array → tensor (avoids slow PIL per-image loading)
+assert N_TOTAL <= len(dataset), f"N_TOTAL={N_TOTAL} > available {len(dataset)}"
+torch.manual_seed(42)
+indices = torch.randperm(len(dataset))[:N_TOTAL]
+
+t0 = time.time()
+# dataset.data is (N, 3, 96, 96) uint8 numpy
+raw = torch.from_numpy(dataset.data[indices.numpy()]).float() / 255.0
+target_images = F.interpolate(raw, size=(IMG_SIZE, IMG_SIZE), mode="bilinear", align_corners=False)
+del raw
+elapsed = time.time() - t0
+print(f"  Loaded {N_TOTAL} images in {elapsed:.1f}s: {target_images.shape}")
 print(f"  Selected {N_TOTAL} images: {target_images.shape}")
 print(f"  Value range: [{target_images.min():.3f}, {target_images.max():.3f}]")
 
@@ -134,7 +139,7 @@ for batch_start in range(0, N_TOTAL, VJEPA_BATCH):
         batch_feats = torch.cat(feats, dim=1)
         vjepa_features.append(batch_feats)
 
-    if (batch_start + VJEPA_BATCH) % 160 == 0 or batch_end == N_TOTAL:
+    if (batch_start + VJEPA_BATCH) % 1600 == 0 or batch_end == N_TOTAL:
         elapsed = time.time() - t0
         print(f"    {batch_end}/{N_TOTAL} ({elapsed:.1f}s)")
 
@@ -167,23 +172,35 @@ print(f"  Video projector: {video_proj_w.shape}")
 print(f"  Brain predictor: {pred_w.shape} → 20484 cortical vertices")
 
 print(f"\nProjecting {N_TOTAL} images through TRIBE v2 brain mapping...")
-with torch.no_grad():
-    video_projected = F.linear(vjepa_features, video_proj_w, video_proj_b)
-    B = video_projected.shape[0]
-    text_zeros = torch.zeros(B, 384)
-    audio_zeros = torch.zeros(B, 384)
-    combined = torch.cat([text_zeros, audio_zeros, video_projected], dim=1)
+TRIBE_CHUNK = 10000
+full_brain_chunks = []
+t0 = time.time()
+for chunk_start in range(0, N_TOTAL, TRIBE_CHUNK):
+    chunk_end = min(chunk_start + TRIBE_CHUNK, N_TOTAL)
+    chunk_feats = vjepa_features[chunk_start:chunk_end]
+    with torch.no_grad():
+        video_projected = F.linear(chunk_feats, video_proj_w, video_proj_b)
+        B = video_projected.shape[0]
+        text_zeros = torch.zeros(B, 384)
+        audio_zeros = torch.zeros(B, 384)
+        combined = torch.cat([text_zeros, audio_zeros, video_projected], dim=1)
 
-    if combiner_w is not None:
-        combined = F.linear(combined, combiner_w, combiner_b)
-        combined = F.gelu(combined)
-        if "combiner.norm.weight" in state_dict:
-            ln_w = state_dict["combiner.norm.weight"]
-            ln_b = state_dict["combiner.norm.bias"]
-            combined = F.layer_norm(combined, [1152], ln_w, ln_b)
+        if combiner_w is not None:
+            combined = F.linear(combined, combiner_w, combiner_b)
+            combined = F.gelu(combined)
+            if "combiner.norm.weight" in state_dict:
+                ln_w = state_dict["combiner.norm.weight"]
+                ln_b = state_dict["combiner.norm.bias"]
+                combined = F.layer_norm(combined, [1152], ln_w, ln_b)
 
-    brain_2048 = F.linear(combined, low_rank_w)
-    full_brain = torch.einsum("bh,shv->bv", brain_2048, pred_w) + pred_b.squeeze(0)
+        brain_2048 = F.linear(combined, low_rank_w)
+        brain_chunk = torch.einsum("bh,shv->bv", brain_2048, pred_w) + pred_b.squeeze(0)
+    full_brain_chunks.append(brain_chunk)
+    elapsed = time.time() - t0
+    print(f"    {chunk_end}/{N_TOTAL} ({elapsed:.0f}s)")
+
+full_brain = torch.cat(full_brain_chunks, dim=0)
+del full_brain_chunks
 
 print(f"  Full brain activity: {full_brain.shape}")
 print(f"  Brain range: [{full_brain.min():.3f}, {full_brain.max():.3f}]")
@@ -219,18 +236,18 @@ print(f"\n{'=' * 70}")
 print("TRAINING CORTEXFLOW ON NATURAL IMAGES")
 print("=" * 70)
 
-# Bigger model for 128×128
+# Larger model for 128×128 with 90K training images
 # VAE: [64,128,256] + 8 latent → latent (8, 16, 16) = 2048 dims, 64 DiT tokens
-# DiT: hidden=256, depth=8, heads=8 → ~30M params
+# DiT: hidden=384, depth=12, heads=12 → ~70M params
 img_model = Brain2Image(
     n_voxels=N_VOXELS, img_size=IMG_SIZE,
-    dit_config=DiTConfig(hidden_dim=256, depth=8, num_heads=8, cond_dim=256),
+    dit_config=DiTConfig(hidden_dim=384, depth=12, num_heads=12, cond_dim=384),
     vae_config=VAEConfig(hidden_dims=[64, 128, 256], latent_channels=8),
     flow_config=FlowConfig(),
 ).to(DEVICE)
 print(f"  Model params: {sum(p.numel() for p in img_model.parameters()) / 1e6:.1f}M")
 
-target_images = target_images.to(DEVICE)
+# Keep images on CPU, move batches to GPU on demand (100K images = 18GB)
 brain_patterns = brain_patterns.to(DEVICE)
 
 # ── Train VAE ──
@@ -241,7 +258,7 @@ vae_sched = torch.optim.lr_scheduler.CosineAnnealingLR(vae_opt, VAE_STEPS)
 t0 = time.time()
 for step in range(VAE_STEPS):
     idx = torch.randint(0, N_TOTAL, (BATCH_SIZE,))
-    batch = target_images[idx]
+    batch = target_images[idx].to(DEVICE)
     recon, mu, logvar = img_model.vae(batch)
     loss, _ = img_model.vae.loss(batch, recon, mu, logvar)
     vae_opt.zero_grad()
@@ -252,13 +269,18 @@ for step in range(VAE_STEPS):
         print(f"    VAE step {step}: loss={loss.item():.4f} ({time.time() - t0:.0f}s)")
 img_model.vae.eval()
 
-# Cache latents
+# Cache latents (keep on CPU, load per-batch during training)
+print(f"  Caching latents for {N_TOTAL} images...")
+t0_lat = time.time()
 with torch.no_grad():
     all_latents = []
-    for i in range(0, N_TOTAL, 32):
-        z, _, _ = img_model.vae.encode(target_images[i:i+32])
+    for i in range(0, N_TOTAL, 64):
+        batch = target_images[i:i+64].to(DEVICE)
+        z, _, _ = img_model.vae.encode(batch)
         all_latents.append(z.cpu())
-    all_latents = torch.cat(all_latents).to(DEVICE)
+        if (i + 64) % 10000 == 0 or i + 64 >= N_TOTAL:
+            print(f"    {min(i+64, N_TOTAL)}/{N_TOTAL} ({time.time()-t0_lat:.0f}s)")
+    all_latents = torch.cat(all_latents)
     IMG_LATENT_SHAPE = all_latents.shape[1:]
 print(f"  Latent shape: {list(IMG_LATENT_SHAPE)}")
 
@@ -266,7 +288,7 @@ print(f"  Latent shape: {list(IMG_LATENT_SHAPE)}")
 with torch.no_grad():
     vae_ssims = []
     for i in range(0, min(200, N_TOTAL), 32):
-        batch = target_images[i:i+32]
+        batch = target_images[i:i+32].to(DEVICE)
         z, _, _ = img_model.vae.encode(batch)
         recon = img_model.vae.decode(z).clamp(0, 1)
         for j in range(batch.shape[0]):
@@ -280,7 +302,7 @@ brain_sched = torch.optim.lr_scheduler.CosineAnnealingLR(brain_enc_opt, BRAIN_PR
 for step in range(BRAIN_PRETRAIN_STEPS):
     idx = torch.randint(0, N_TRAIN, (BATCH_SIZE,))
     brain = BrainData(voxels=brain_patterns[idx])
-    target_lat = all_latents[idx].flatten(1)
+    target_lat = all_latents[idx].to(DEVICE).flatten(1)
     bg, _ = img_model.encode_brain(brain)
     n_match = min(bg.shape[1], target_lat.shape[1])
     loss = F.mse_loss(bg[:, :n_match], target_lat[:, :n_match])
@@ -299,7 +321,7 @@ lam = 5.0
 XtX = X.T @ X + lam * torch.eye(X.shape[1])
 XtY = X.T @ Y
 W = torch.linalg.solve(XtX, XtY)
-img_lin_preds = (brain_patterns.cpu() @ W).view(-1, *IMG_LATENT_SHAPE).to(DEVICE)
+img_lin_preds = (brain_patterns.cpu() @ W).view(-1, *IMG_LATENT_SHAPE)
 
 with torch.no_grad():
     lin_train_cos = F.cosine_similarity(
@@ -315,7 +337,7 @@ print(f"\n  Training DiT ({DIT_STEPS} steps, residual mode, EMA)...")
 dit_params = list(img_model.dit.parameters()) + list(img_model.brain_encoder.parameters())
 dit_opt = torch.optim.AdamW(dit_params, lr=DIT_LR, weight_decay=WEIGHT_DECAY)
 
-warmup_steps = 1000
+warmup_steps = 2000
 total_steps = DIT_STEPS
 
 
@@ -343,7 +365,7 @@ for step in range(DIT_STEPS):
             voxels=brain.voxels + NOISE_AUGMENT * torch.randn_like(brain.voxels)
         )
 
-    residual = all_latents[idx] - img_lin_preds[idx]
+    residual = (all_latents[idx] - img_lin_preds[idx]).to(DEVICE)
 
     bg, bt = img_model.encode_brain(brain)
     loss = img_model.flow_matcher.compute_loss(img_model.dit, residual, bg, bt)
@@ -356,7 +378,7 @@ for step in range(DIT_STEPS):
     ema.update(img_model)
     losses.append(loss.item())
 
-    if step % 10000 == 0 or step == DIT_STEPS - 1:
+    if step % 15000 == 0 or step == DIT_STEPS - 1:
         avg_loss = sum(losses[-1000:]) / min(len(losses), 1000)
         elapsed = time.time() - t0
         eta = elapsed / max(step + 1, 1) * (DIT_STEPS - step - 1)
@@ -388,10 +410,10 @@ def evaluate(indices, label=""):
         for s in range(N_AVG):
             torch.manual_seed(s)
             z = img_model.flow_matcher.sample(
-                img_model.dit, shape_1, bg, bt, num_steps=50,
+                img_model.dit, shape_1, bg, bt, num_steps=5,
                 cfg_scale=IMG_CFG_SCALE,
             )
-            z = z + img_lin_preds[i:i + 1]
+            z = z + img_lin_preds[i:i + 1].to(DEVICE)
             latent_sum = z if latent_sum is None else latent_sum + z
         avg_z = latent_sum / N_AVG
         with torch.no_grad():
@@ -429,7 +451,7 @@ print(f"    SSIM={test_ssim:.3f} ± {test_ssim_std:.3f}")
 lin_test_results = {}
 for i in eval_test_idx:
     with torch.no_grad():
-        recon = img_model.vae.decode(img_lin_preds[i:i + 1])[0].detach().clamp(0, 1).cpu()
+        recon = img_model.vae.decode(img_lin_preds[i:i + 1].to(DEVICE))[0].detach().clamp(0, 1).cpu()
     target = target_images[i].cpu()
     cos = F.cosine_similarity(
         recon.flatten().unsqueeze(0), target.flatten().unsqueeze(0)
@@ -619,10 +641,10 @@ for row, brain_idx in enumerate(div_indices):
     for s in range(N_DIV_SAMPLES):
         torch.manual_seed(s * 1000 + brain_idx)
         z = img_model.flow_matcher.sample(
-            img_model.dit, shape_1, bg, bt, num_steps=50,
+            img_model.dit, shape_1, bg, bt, num_steps=5,
             cfg_scale=IMG_CFG_SCALE,
         )
-        z = z + img_lin_preds[brain_idx:brain_idx + 1]
+        z = z + img_lin_preds[brain_idx:brain_idx + 1].to(DEVICE)
         with torch.no_grad():
             recon = img_model.vae.decode(z)[0].detach().clamp(0, 1).cpu()
         samples.append(recon)

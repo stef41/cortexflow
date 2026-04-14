@@ -4,69 +4,69 @@
   "feature_extractor": "V-JEPA2 ViT-Giant",
   "n_voxels": 384,
   "img_size": 128,
-  "n_train": 8000,
-  "n_test": 2000,
-  "test_cos": 0.8724,
-  "test_cos_std": 0.0864,
-  "test_ssim": 0.4513,
-  "test_ssim_std": 0.226,
-  "linear_baseline_cos": 0.8442,
-  "linear_baseline_ssim": 0.3965,
-  "gap_cos": 0.0282,
-  "gap_ssim": 0.0548,
-  "vlm_correctness": 0.5636,
-  "vlm_diversity": 0.309,
-  "intra_brain_diversity": 0.0509,
+  "n_train": 90000,
+  "n_test": 10000,
+  "test_cos": 0.9108,
+  "test_cos_std": 0.0561,
+  "test_ssim": 0.5866,
+  "test_ssim_std": 0.1953,
+  "linear_baseline_cos": 0.8599,
+  "linear_baseline_ssim": 0.4686,
+  "gap_cos": 0.0509,
+  "gap_ssim": 0.118,
+  "vlm_correctness": 0.6544,
+  "vlm_diversity": 0.4055,
+  "intra_brain_diversity": 0.0474,
   "captions": {
-    "8000": {
-      "target": "The image features a close-up of a sea turtle resting on a textured surface, likely sand or a similar material, with a dark background that contrasts sharply with its light-colored shell and darker flippers. The turtle's shell displays a pattern of light and dark patches, giving it a mottled appearance, while its flippers have a smoother texture with darker speckles. The composition is simple, focusing solely on the turtle, which occupies most of the frame, creating a sense of intimacy and highlighting the intricate details of its skin and shell.",
-      "recon": "The image depicts a close-up of a textured surface, possibly a rock or a piece of wood, with a gradient of colors ranging from dark blue at the top to lighter shades of gray and white towards the bottom. The texture appears rough and uneven, with visible grain patterns that add depth and dimension to the scene. The composition is centered, focusing on the intricate details of the surface, which creates a sense of intimacy and detail-oriented observation. The overall scene evokes a natural, earthy feel, with the interplay of light and shadow enhancing the three-dimensional quality of the subject.",
-      "sim": 0.5042
+    "90000": {
+      "target": "The image features a close-up of a human skull against a stark black background, highlighting its pale bone structure with subtle variations in color from light beige to darker hues around the eye sockets and nasal cavity. The texture appears smooth yet slightly porous, typical of fossilized remains, and the composition is centered, drawing full attention to the intricate details of the skull's facial features and cranium.",
+      "recon": "The image features a close-up of a dog's face, with a blurred effect that obscures fine details but hints at warm, earthy tones like light brown and beige. The texture appears soft and slightly out of focus, suggesting fur. The composition is centered on the dog's head, with a dark background that contrasts sharply with the lighter fur, creating a sense of depth and drawing attention to the subject. The overall scene evokes a sense of calmness and intimacy, despite the lack of sharp detail.",
+      "sim": 0.6093
     },
-    "8001": {
-      "target": "The image features a Japanese macaque monkey, characterized by its light brown fur with subtle darker patches, sitting on a rocky surface. The texture of the monkey's fur appears soft and slightly shaggy, while the rocks have a rough, granular appearance. The composition is simple, with the monkey positioned centrally against a backdrop of muted earth tones, suggesting a natural outdoor setting. The lighting is soft and diffused, casting gentle shadows that enhance the three-dimensional quality of the scene without harsh contrasts.",
-      "recon": "The image features a close-up of a textured surface, likely a rock or mineral, with a mottled pattern of dark gray, black, and white hues. The texture appears rough and granular, suggesting a natural formation. The composition is centered around the central portion of the rock, which dominates the frame, while the edges fade into a blurred background, emphasizing the rock's intricate details and color variations.",
-      "sim": 0.5267
+    "90001": {
+      "target": "The image features a Doberman Pinscher standing alertly in a well-lit indoor setting, with its sleek black coat accented by tan markings on its paws, chest, and face, creating a striking contrast against the warm-toned brick wall and soft beige curtains in the background. The dog's glossy fur and sharp, defined musculature are highlighted by the lighting, which casts subtle shadows that enhance the texture of its coat. The composition is centered around the dog, with its full body captured from a slightly elevated angle, emphasizing its poised stance and the elegance of its breed. The overall scene conveys a sense of calm authority",
+      "recon": "The image depicts a dark-colored dog with a shaggy coat standing against a textured, light-colored wall. The dog's fur appears thick and somewhat unkempt, giving it a rugged appearance. The composition is simple, with the dog positioned slightly off-center to the left, creating a sense of depth as it looks upwards towards the top left corner of the frame. The background wall has a rough, possibly stucco-like texture that contrasts with the smoothness of the dog's fur. The lighting is even, suggesting an overcast day or diffused indoor lighting, which softens the overall image and emphasizes the textures without harsh shadows.",
+      "sim": 0.8052
     },
-    "8002": {
-      "target": "The image features a chestnut-colored horse with a glossy coat, standing amidst lush green grass. The horse is wearing a black halter and appears to be grazing or sniffing the ground. The background is slightly blurred, emphasizing the horse as the main subject, while the vibrant greenery adds depth and context to the pastoral setting. The textures of the horse's fur and the grass create a natural and serene composition.",
-      "recon": "The image depicts a close-up of a horse's head and neck against a blurred green background, likely grass or foliage. The horse's coat is a rich brown with darker mane and a lighter patch around its muzzle, creating a striking contrast. The texture of the fur appears soft and slightly shaggy, adding depth to the image. The composition is dynamic, with the horse's head slightly tilted, giving a sense of movement and engagement. The background is out of focus, emphasizing the horse as the main subject and creating a bokeh effect that enhances the overall visual appeal.",
-      "sim": 0.8248
+    "90002": {
+      "target": "The image features a lizard perched on a rugged, textured rock formation, with its body blending subtly into the earthy tones of the surrounding stones. The lizard's scales exhibit a mix of muted greens and browns, mirroring the natural hues of the environment, while its tail extends gracefully over the rocks. The composition is dynamic, with the lizard positioned slightly off-center, creating a sense of movement and balance against the rough, uneven surface of the rocks. The overall scene evokes a serene, natural setting, emphasizing the harmony between the lizard and its habitat.",
+      "recon": "The image depicts a lion lying down on a log, with its head resting on its front paws, surrounded by a dark, possibly forested background. The lion's fur is a mix of golden and brown hues, with darker shades around its mane and face, creating a striking contrast against the muted tones of the log and the background. The texture of the lion's fur appears soft and slightly shaggy, while the log has a rough, weathered surface. The composition is simple yet evocative, focusing on the lion as the central subject, with the blurred background emphasizing the animal's presence and adding depth to the scene.",
+      "sim": 0.4451
     },
-    "8003": {
-      "target": "The image depicts a Belgian Malinois dog standing on its hind legs, leaning against a person wearing camouflage pants, with another individual in jeans partially visible in the background. The dog's coat is a rich, dark brown with subtle reddish-brown tones, and its fur appears smooth and well-groomed. The person in camouflage pants has a thick, textured fabric that contrasts with the dog's sleek coat. The background is an outdoor setting with grass and a hint of a fence or structure, suggesting a training or recreational area for dogs. The composition focuses on the interaction between the dog and the person, emphasizing the dog's alert posture and",
-      "recon": "The image depicts a blurred scene of a person walking through a natural setting, possibly a forest or park, with a mix of earthy tones including browns, greens, and hints of blue. The texture appears soft and slightly out of focus, suggesting motion or a shallow depth of field. The composition is centered around the individual, who seems to be moving from left to right, with trees and foliage in the background creating a sense of depth and natural environment. The overall scene conveys a serene, outdoor atmosphere despite the lack of sharpness.",
-      "sim": 0.4403
+    "90003": {
+      "target": "The image captures a dynamic moment of a bobsledder in action, wearing a red jacket with black pants and a white helmet, sliding at high speed on a sleek, green and white bobsled. The blurred background emphasizes the speed and motion, while the smooth curves of the bobsled and the athlete's aerodynamic posture suggest a high level of precision and control. The composition is centered on the bobsledder, drawing the viewer's attention to their focused expression and the vibrant contrast between the red jacket and the green and white bobsled.",
+      "recon": "The image features a close-up of a red and black object with a textured surface, possibly a tool or piece of machinery, set against a blurred background that suggests an industrial setting. The vibrant red contrasts sharply with the dark tones of the object, while the texture appears rough and worn, hinting at frequent use. The composition is tight, focusing on the object's details, which are slightly out of focus, adding to the sense of depth and context within the scene.",
+      "sim": 0.4902
     },
-    "8004": {
-      "target": "The image features a weathered military tank as the central subject, its dark gray and black paint showing signs of wear and tear, with patches of rust and dirt visible on its surface. The tank is positioned on a patch of dry, brown earth, contrasting sharply with the vibrant green grass surrounding it. In the background, a blurred blue sky and distant water suggest an open field or coastal area, adding depth to the composition. The overall scene evokes a sense of abandonment and the passage of time, with the tank's rugged texture and muted colors enhancing the atmosphere of decay and history.",
-      "recon": "The image depicts a close-up of a textured surface with a mix of earthy tones, primarily browns and greens, suggesting a natural or organic material like soil or moss. The texture appears rough and uneven, with variations in shading that create a sense of depth and dimensionality. The composition is centered around a small, dark object that resembles a seed or a small stone, which stands out against the lighter background due to its darker color and slightly smoother surface. The overall scene evokes a feeling of being outdoors, possibly in a forest floor or a similar natural setting.",
-      "sim": 0.6027
+    "90004": {
+      "target": "The image features a close-up of a dark brown antelope with a lighter underbelly, standing amidst dry, golden-brown grasses. The antelope's coat has a slightly rough texture, and its horns curve upwards, adding to its majestic appearance. The background is filled with more of the same dry grass and a few indistinct trees, creating a natural, earthy setting that emphasizes the animal's presence. The composition is centered around the antelope, making it the clear focal point against the blurred backdrop, which suggests a serene, wild environment.",
+      "recon": "The image features a deer with prominent antlers as the central subject, standing against a blurred background of earthy tones. The deer's fur appears dark, possibly brown or black, contrasting with the lighter, textured ground beneath it. The background is out of focus, creating a shallow depth of field that emphasizes the deer while suggesting a natural, outdoor setting. The overall composition is simple yet striking, drawing attention to the deer's form and the subtle details of its antlers and coat.",
+      "sim": 0.7726
     },
-    "8005": {
-      "target": "The image features a Wirehaired Pointing Griffon lying on a grassy field, with its distinctive wiry coat displaying shades of gray, brown, and black, creating a textured appearance that contrasts against the soft green backdrop. The dog is positioned centrally, with its head slightly turned to the side, giving a sense of calmness and attentiveness. The composition is simple yet effective, focusing entirely on the dog and its immediate surroundings, which emphasize the natural setting and the dog's unique coat texture.",
-      "recon": "The image depicts a close-up of a person's face, blurred with a bokeh effect that emphasizes the background while softening the details of the subject. The background features a mix of warm earthy tones, including shades of brown, green, and beige, suggesting an outdoor setting with natural elements like grass or foliage. The texture appears slightly grainy, adding to the impression of a candid, possibly vintage photograph. The composition is centered around the subject's face, which is partially obscured by the blur, creating a sense of mystery and focus on the surrounding environment rather than the individual.",
-      "sim": 0.512
+    "90005": {
+      "target": "The image features a wild boar standing amidst a patch of green grass and scattered leaves, with its coarse, bristly fur contrasting against the vibrant greenery. The boar's body is positioned slightly to the left, facing right, and its textured skin appears rugged and weathered, suggesting it has been in the wild for some time. The background is a mix of earthy tones and hints of darker foliage, creating a natural, somewhat blurred setting that emphasizes the boar as the central focus. The overall composition is simple yet evocative, capturing a moment of the boar in its natural habitat.",
+      "recon": "The image features a large, brown animal, possibly a hippopotamus, standing in a grassy field with a blurred background that suggests a natural, outdoor setting. The animal's textured skin is prominent, with visible folds and a slightly darker shade on its back, contrasting against the lighter green of the grass beneath it. The composition is simple, focusing on the animal as the central subject, with the soft focus of the background emphasizing the foreground.",
+      "sim": 0.6928
     },
-    "8006": {
-      "target": "The image features a warthog standing in a grassy field, with its body covered in a mix of brown and grayish-brown fur, accented by darker stripes and patches that give it a textured appearance. The warthog's tusks are visible as it faces to the right, and the background consists of a blurred green landscape, suggesting a natural habitat. The composition is simple, focusing on the warthog as the central subject against the soft, out-of-focus backdrop, creating a sense of depth and emphasizing the animal's presence in its environment.",
-      "recon": "The image depicts a close-up of a wild boar in a natural setting, with its coarse, reddish-brown fur blending into the green grassy background. The boar's textured skin and the surrounding foliage create a harmonious yet slightly blurred composition, suggesting motion or a focus on the animal rather than the environment. The overall scene conveys a sense of wildlife in its habitat.",
-      "sim": 0.7059
+    "90006": {
+      "target": "The image depicts a forklift with a white cab and black forks, parked indoors in a warehouse setting. The background features industrial elements such as metal walls, a green door, and various equipment, creating a utilitarian atmosphere. The lighting is dim, casting shadows that add depth to the scene, while the focus is slightly blurred, giving it a soft, almost dreamlike quality. The textures of the forklift's metal components contrast with the smoother surfaces of the warehouse walls and floor, contributing to the overall industrial aesthetic.",
+      "recon": "The image depicts a close-up of a person's legs and feet, clad in dark-colored pants and boots, standing on a textured surface that appears to be a mix of concrete and gravel. The background is blurred, suggesting an outdoor setting with indistinct structures or objects, possibly indicating a construction site or industrial area. The overall color palette is muted, dominated by grays and blacks, with subtle hints of earthy tones from the ground. The composition focuses on the lower body, creating a sense of groundedness and realism, while the blurred background adds depth and context without distracting from the main subject.",
+      "sim": 0.6135
     },
-    "8007": {
-      "target": "The image features a Union Pacific locomotive with the words \"Union Pacific\" prominently displayed in white lettering against a dark green background, set against a clear blue sky. The locomotive's surface is textured with visible wear and graffiti, adding a gritty, urban feel to the scene. The composition places the train centrally, drawing the viewer's attention to its imposing presence, while the stark contrast between the locomotive and the bright sky enhances the visual impact of the image.",
-      "recon": "The image depicts a serene landscape featuring a large, dark rock formation partially submerged in water, with a gradient of blue hues dominating the background, suggesting either early morning or late evening light. The rock's surface appears rough and textured, contrasting with the smooth, reflective water that mirrors its shape. The composition is balanced, with the rock centrally positioned, creating a sense of calm and tranquility.",
-      "sim": 0.4172
+    "90007": {
+      "target": "The image features a close-up of a groundhog with a mix of brown and gray fur, showcasing its textured coat and prominent whiskers. The animal is positioned centrally against a blurred background of green foliage, creating a shallow depth of field that emphasizes the groundhog's face and upper body. The overall scene suggests a natural outdoor setting, possibly during daylight hours, as indicated by the soft lighting and shadows on the groundhog's fur.",
+      "recon": "The image features a fluffy, light-colored animal, possibly a small rodent or a young mammal, with a soft, textured fur that appears slightly out of focus, giving it a dreamy quality. The animal is positioned centrally against a blurred background of green foliage, which suggests an outdoor setting. The overall scene has a natural, serene feel, with the animal as the focal point.",
+      "sim": 0.7225
     },
-    "8008": {
-      "target": "The image features a large snake with a pattern of brown, tan, and cream-colored scales coiled around a person's arm, showcasing its intricate texture and vibrant coloration against the backdrop of a dimly lit indoor setting. The composition highlights the snake's impressive size and the contrast between its natural patterns and the human element holding it, while the website URL at the bottom suggests a connection to reptile-related content.",
-      "recon": "The image presents an abstract composition dominated by a swirling blend of dark and vibrant colors, primarily reds, purples, and blacks, creating a sense of depth and movement. The textures appear to be a mix of smooth and rough elements, with some areas appearing almost liquid-like, while others have a more granular or crystalline quality. The composition is dynamic, with the colors and textures intermingling in a way that suggests a chaotic yet harmonious flow, evoking a feeling of energy and intensity. The overall scene is enigmatic, leaving much to interpretation due to its abstract nature.",
-      "sim": 0.5199
+    "90008": {
+      "target": "The image prominently features a white semi-truck with a large trailer, driving along a highway under a clear blue sky. The truck's shiny chrome grille and headlights reflect light, contrasting with the smooth, reflective surface of the road beneath it. The composition is dynamic, with the truck angled slightly to the left, suggesting motion, while the open sky and distant horizon create a sense of depth and vastness. The bright white of the truck stands out against the muted tones of the asphalt and the subtle greenish hue of the grassy area beside the road, emphasizing the vehicle as the focal point of the scene.",
+      "recon": "The image depicts a vintage car with a shiny chrome grille and a white body, parked on a dirt road under a clear blue sky. The car's surface reflects light, highlighting its polished metal texture, while the surrounding environment appears dry and dusty, suggesting a rural or desert setting. The composition is straightforward, focusing on the vehicle as the central subject, with the background slightly blurred to emphasize the car's details.",
+      "sim": 0.7478
     },
-    "8009": {
-      "target": "The image features a vintage yellow Volkswagen Westfalia van parked on a road with a scenic green hillside in the background, showcasing its classic design with a white roof and black trim, set against a soft focus that emphasizes the vehicle's warm tones and smooth curves.",
-      "recon": "The image depicts a vibrant, abstract representation of a car, with a dominant palette of warm hues including orange, yellow, and green, accented by darker tones that suggest depth and shadow. The texture is reminiscent of a watercolor painting, with soft, blended strokes creating a sense of movement and fluidity. The composition is centered, drawing the viewer's eye directly to the car, which appears to be in motion against a blurred background, suggesting speed and dynamism. The overall scene evokes a sense of energy and artistic interpretation rather than a realistic depiction.",
-      "sim": 0.6094
+    "90009": {
+      "target": "The image features a black dog standing outdoors on a gravel path, with its fur appearing smooth and shiny, contrasting against the rough texture of the ground. The background includes blurred autumn foliage, adding warm hues of orange and yellow that complement the dog's dark coat. The composition is centered around the dog, which is slightly out of focus, creating a soft, dreamy effect that draws attention to the animal while subtly blending it into the natural setting.",
+      "recon": "The image features a black dog standing outdoors, with its fur appearing slightly textured and somewhat out of focus, giving it a soft, almost dreamy quality. The background is blurred, suggesting a natural setting with earthy tones, possibly indicating a park or rural area. The composition centers on the dog, which occupies most of the frame, creating a sense of depth and drawing attention to its form against the less distinct backdrop.",
+      "sim": 0.8952
     }
   }
 }
