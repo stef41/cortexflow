@@ -1,0 +1,284 @@
+======================================================================
+CROSS-MODAL TRANSFER & CONSISTENCY STUDY
+Does the image brain encoder already know what it's seeing?
+======================================================================
+
+Loading STL-10 natural images...
+  Images: torch.Size([10000, 3, 128, 128])
+  Loading labeled test set...
+  Labeled: torch.Size([8000, 3, 128, 128]), labels: torch.Size([8000])
+  Loading labeled train set...
+  Labeled train: torch.Size([5000, 3, 128, 128])
+
+Loading V-JEPA2 (ViT-Giant)...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 281/843 [00:00<00:00, 2748.91it/s]Loading weights:  70%|██████▉   | 588/843 [00:00<00:00, 2899.72it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 3473.36it/s]
+  Extracting features for 10000 unlabeled images...
+    320/10000 (2.5s)
+    640/10000 (4.3s)
+    960/10000 (6.2s)
+    1280/10000 (8.1s)
+    1600/10000 (9.9s)
+    1920/10000 (11.8s)
+    2240/10000 (13.6s)
+    2560/10000 (15.4s)
+    2880/10000 (17.2s)
+    3200/10000 (19.0s)
+    3520/10000 (20.6s)
+    3840/10000 (22.3s)
+    4160/10000 (23.9s)
+    4480/10000 (25.7s)
+    4800/10000 (27.6s)
+    5120/10000 (29.4s)
+    5440/10000 (31.0s)
+    5760/10000 (32.7s)
+    6080/10000 (34.4s)
+    6400/10000 (36.2s)
+    6720/10000 (38.1s)
+    7040/10000 (39.8s)
+    7360/10000 (41.4s)
+    7680/10000 (43.1s)
+    8000/10000 (44.7s)
+    8320/10000 (46.4s)
+    8640/10000 (48.1s)
+    8960/10000 (49.8s)
+    9280/10000 (51.7s)
+    9600/10000 (53.5s)
+    9920/10000 (55.2s)
+    10000/10000 (55.7s)
+  V-JEPA2 features: torch.Size([10000, 2816])
+
+  Extracting features for 8000 labeled TEST images...
+    320/8000 (1.7s)
+    640/8000 (3.3s)
+    960/8000 (4.9s)
+    1280/8000 (6.7s)
+    1600/8000 (8.4s)
+    1920/8000 (10.1s)
+    2240/8000 (11.9s)
+    2560/8000 (13.7s)
+    2880/8000 (15.3s)
+    3200/8000 (17.2s)
+    3520/8000 (18.8s)
+    3840/8000 (20.5s)
+    4160/8000 (22.1s)
+    4480/8000 (23.8s)
+    4800/8000 (25.4s)
+    5120/8000 (27.1s)
+    5440/8000 (28.9s)
+    5760/8000 (30.6s)
+    6080/8000 (32.4s)
+    6400/8000 (34.1s)
+    6720/8000 (35.9s)
+    7040/8000 (37.8s)
+    7360/8000 (39.5s)
+    7680/8000 (41.2s)
+    8000/8000 (42.9s)
+  Labeled test V-JEPA2 features: torch.Size([8000, 2816])
+
+  Extracting features for 5000 labeled TRAIN images...
+    320/5000 (1.6s)
+    640/5000 (3.2s)
+    960/5000 (4.9s)
+    1280/5000 (6.7s)
+    1600/5000 (8.4s)
+    1920/5000 (10.2s)
+    2240/5000 (12.0s)
+    2560/5000 (13.7s)
+    2880/5000 (15.4s)
+    3200/5000 (17.1s)
+    3520/5000 (18.6s)
+    3840/5000 (20.2s)
+    4160/5000 (21.7s)
+    4480/5000 (23.4s)
+    4800/5000 (25.1s)
+    5000/5000 (26.3s)
+  Labeled train V-JEPA2 features: torch.Size([5000, 2816])
+
+Loading TRIBE v2 brain mapping head...
+  Mapping unlabeled images through TRIBE v2...
+  Full brain: torch.Size([10000, 20484])
+  Brain patterns: torch.Size([10000, 384])
+  Labeled test brain: torch.Size([8000, 384])
+  Labeled train brain: torch.Size([5000, 384])
+
+Loading trained cortexflow model...
+  Image model: 23.0M params
+  Latent shape: [8, 16, 16]
+  Ready for cross-modal analysis
+
+======================================================================
+ANALYSIS 1: BASELINE CLASSIFIERS
+======================================================================
+
+  kNN classifier on raw brain patterns...
+    kNN (k= 1): 82.2%
+    kNN (k= 5): 86.1%
+    kNN (k=10): 88.5%
+    kNN (k=20): 90.5%
+
+  Linear probe on raw brain patterns...
+    Linear probe: train=100.0%, test=93.8%
+
+  kNN on frozen brain encoder features...
+    Encoder kNN (k= 1): 65.7%
+    Encoder kNN (k= 5): 69.5%
+    Encoder kNN (k=10): 70.9%
+    Encoder kNN (k=20): 70.5%
+
+======================================================================
+ANALYSIS 2: TRANSFER LEARNING — TEXT CLASSIFIER ON FROZEN ENCODER
+======================================================================
+  Text classifier params: 134,667 (0.135M)
+
+  Training (15000 steps, batch=128, noise_aug=0.1)...
+    Step     0: loss=2.3775, train=11.8%, test=11.6% (0.1s)
+    Step  1000: loss=1.3156, train=80.5%, test=77.1% (1.7s)
+    Step  2000: loss=1.1448, train=83.6%, test=78.9% (3.4s)
+    Step  3000: loss=1.0971, train=85.6%, test=79.9% (5.1s)
+    Step  4000: loss=1.0691, train=86.8%, test=80.1% (6.8s)
+    Step  5000: loss=1.1112, train=88.1%, test=80.7% (8.5s)
+    Step  6000: loss=1.0735, train=88.7%, test=81.0% (10.2s)
+    Step  7000: loss=1.0397, train=90.0%, test=81.3% (11.9s)
+    Step  8000: loss=1.0982, train=90.2%, test=81.3% (13.6s)
+    Step  9000: loss=1.1104, train=90.7%, test=81.4% (15.2s)
+    Step 10000: loss=1.0334, train=91.2%, test=81.8% (16.8s)
+    Step 11000: loss=1.1463, train=91.4%, test=81.6% (18.4s)
+    Step 12000: loss=1.1562, train=91.5%, test=81.7% (20.0s)
+    Step 13000: loss=1.2006, train=91.6%, test=81.6% (21.6s)
+    Step 14000: loss=1.0526, train=91.7%, test=81.7% (23.2s)
+    Step 14999: loss=1.0847, train=91.6%, test=81.7% (24.9s)
+
+  Best test accuracy: 81.8%
+
+  Per-category accuracy:
+    airplane  : 92.9%
+    bird      : 78.5%
+    car       : 93.1%
+    cat       : 67.0%
+    deer      : 79.4%
+    dog       : 64.0%
+    horse     : 84.5%
+    monkey    : 79.4%
+    ship      : 92.4%
+    truck     : 86.4%
+
+======================================================================
+ANALYSIS 3: CROSS-MODAL AGREEMENT
+======================================================================
+
+  Building category prototypes from labeled training images...
+
+  Evaluating cross-modal agreement on 200 test images...
+  (Using ODE_STEPS=5, CFG=1.0 — optimal from sampling study)
+    20/200: text_acc=65.0%, img_acc=15.0%, agreement=15.0% (3.3s)
+    40/200: text_acc=70.0%, img_acc=25.0%, agreement=22.5% (6.4s)
+    60/200: text_acc=71.7%, img_acc=28.3%, agreement=31.7% (8.6s)
+    80/200: text_acc=73.8%, img_acc=31.2%, agreement=32.5% (11.9s)
+    100/200: text_acc=76.0%, img_acc=31.0%, agreement=34.0% (15.2s)
+    120/200: text_acc=76.7%, img_acc=30.0%, agreement=33.3% (18.1s)
+    140/200: text_acc=76.4%, img_acc=27.9%, agreement=31.4% (19.4s)
+    160/200: text_acc=78.1%, img_acc=28.7%, agreement=32.5% (21.4s)
+    180/200: text_acc=77.8%, img_acc=28.9%, agreement=32.8% (24.7s)
+    200/200: text_acc=79.5%, img_acc=29.5%, agreement=33.0% (27.9s)
+
+  Results on 200 test images:
+    Text accuracy:     79.5%
+    Image accuracy:    29.5%
+    Cross-modal agreement: 33.0%
+    Both correct:      27.5%
+    Either correct:    81.5%
+    Mean cos:          0.8912 ± 0.0808
+    Mean SSIM:         0.4983 ± 0.2537
+
+======================================================================
+ANALYSIS 4: CONFUSION STRUCTURE
+======================================================================
+
+  Disagreements: 134/200 (67.0%)
+    Text correct:   104 (77.6%)
+    Image correct:  4 (3.0%)
+    Neither correct: 26 (19.4%)
+
+  Top text confusion pairs:
+    airplane   → ship      : 2
+    bird       → cat       : 2
+    bird       → monkey    : 2
+    car        → ship      : 1
+    car        → truck     : 2
+    cat        → deer      : 4
+    cat        → dog       : 1
+    cat        → monkey    : 2
+    deer       → cat       : 1
+    deer       → horse     : 2
+    dog        → bird      : 1
+    dog        → cat       : 2
+    dog        → horse     : 1
+    dog        → monkey    : 4
+    horse      → cat       : 1
+    horse      → deer      : 1
+    horse      → dog       : 1
+    horse      → monkey    : 3
+    monkey     → cat       : 1
+    monkey     → dog       : 2
+    ship       → deer      : 1
+    ship       → truck     : 1
+    truck      → car       : 2
+    truck      → ship      : 1
+
+======================================================================
+ANALYSIS 5: BRAIN ENCODER REPRESENTATION STRUCTURE
+======================================================================
+
+  Category similarity in raw brain space:
+
+  Category similarity in encoder feature space:
+    Raw brain avg inter-class similarity:    -0.040
+    Encoder avg inter-class similarity:      0.664
+    Separation improvement:                  -0.704
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  → crossmodal_transfer_accuracy.png
+  → crossmodal_confusion.png
+  → crossmodal_representation.png
+  → crossmodal_agreement.png
+
+  Results saved to train_outputs/crossmodal_transfer_results.json
+
+======================================================================
+SUMMARY
+======================================================================
+
+  Classification accuracy:
+    kNN (raw brain, k=5):     86.1%
+    Linear probe (raw brain): 93.8%
+    kNN (encoder, k=5):       69.5%
+    Transfer classifier:      81.8%
+
+  Cross-modal agreement (200 test images):
+    Text accuracy:     79.5%
+    Image accuracy:    29.5%
+    Agreement:         33.0%
+    Both correct:      27.5%
+    Either correct:    81.5%
+
+  Representation:
+    Raw brain inter-class sim:    -0.040
+    Encoder inter-class sim:      0.664
+    Separation improvement:       -0.704
+
+  Reconstruction quality:
+    Mean cos:  0.8912 ± 0.0808
+    Mean SSIM: 0.4983 ± 0.2537
+
+======================================================================
+CROSS-MODAL TRANSFER STUDY COMPLETE
+======================================================================
+
+Key findings:
+  1. Transfer classifier accuracy: 81.8% (from 134,667 trainable params)
+  2. Cross-modal agreement: 33.0%
+  3. Encoder separation improvement: -0.704
+

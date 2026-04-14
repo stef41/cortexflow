@@ -1,0 +1,37 @@
+{
+  "baselines": {
+    "knn_raw_k5": 0.861,
+    "linear_probe": 0.9377500414848328,
+    "knn_encoder_k5": 0.694625
+  },
+  "transfer_classifier": {
+    "test_accuracy": 0.8175000548362732,
+    "params": 134667,
+    "per_category": {
+      "airplane": 0.9287499785423279,
+      "bird": 0.7849999666213989,
+      "car": 0.9312499761581421,
+      "cat": 0.6699999570846558,
+      "deer": 0.793749988079071,
+      "dog": 0.6399999856948853,
+      "horse": 0.8449999690055847,
+      "monkey": 0.793749988079071,
+      "ship": 0.9237499833106995,
+      "truck": 0.8637499809265137
+    }
+  },
+  "crossmodal_agreement": {
+    "text_accuracy": 0.7950000166893005,
+    "image_accuracy": 0.29499998688697815,
+    "agreement": 0.33000001311302185,
+    "both_correct": 0.2750000059604645,
+    "either_correct": 0.8149999976158142,
+    "mean_cos": 0.8912145909667015,
+    "mean_ssim": 0.4982775496148679
+  },
+  "representation": {
+    "raw_inter_class_sim": -0.03982383757829666,
+    "encoder_inter_class_sim": 0.6636890769004822,
+    "separation_improvement": -0.7035129144787788
+  }
+}

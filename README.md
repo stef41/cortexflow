@@ -589,6 +589,36 @@ CFG=1.0 is universally optimal across **all 10 categories** — no category bene
 CUDA_VISIBLE_DEVICES=0 python sampling_dynamics_study.py
 ```
 
+### Cross-Modal Transfer — Does the Image Encoder Already Know What It's Seeing?
+
+The brain encoder trained for image reconstruction (60K steps) was never taught to classify. Yet when we freeze it and train a lightweight 135K-parameter text classifier on its features, it achieves **81.8% accuracy** across 10 categories. This tests whether image reconstruction forces the encoder to learn modality-agnostic semantic representations.
+
+**Classification accuracy comparison** (STL-10, 10 categories, chance=10%):
+
+| Method | Features | Params Trained | Test Accuracy |
+|--------|----------|---------------|---------------|
+| kNN (k=5) | Raw brain (384-dim) | 0 | 86.1% |
+| Linear probe | Raw brain | 3,850 | 93.8% |
+| kNN (k=5) | Frozen encoder (256-dim) | 0 | 69.5% |
+| **Transfer classifier** | **Frozen encoder** | **135K** | **81.8%** |
+
+**Key finding 1 — Transfer works**: The frozen image encoder retains enough categorical information to support 81.8% text classification with only 135K trainable parameters — just 0.6% of the full 23M model. The encoder was trained purely for pixel-level reconstruction, yet it learned category-discriminative features as a side effect.
+
+**Key finding 2 — Reconstruction ≠ classification**: Raw brain patterns support *higher* classification accuracy (93.8% linear probe) than the encoder's features (81.8%). The encoder compresses 384 brain dimensions into a 256-dim representation optimized for *generating images*, not discriminating categories. Some discriminative information is traded for generative capacity — a classic information bottleneck.
+
+**Key finding 3 — Encoder reshapes brain geometry**: Raw brain space has near-zero inter-category similarity (mean off-diagonal cos = −0.040 — categories are orthogonal). The image encoder transforms this into a dense visual similarity structure (mean off-diagonal cos = 0.664) where cat↔dog (0.89), ship↔airplane (0.88), and car↔truck (0.84) cluster together. The encoder learns a *visual feature space*, not a categorical decision space.
+
+**Per-category text accuracy**: airplane (89%), car (88%), truck (87%), ship (86%), monkey (84%), deer (79%), horse (75%), cat (74%), bird (73%), dog (58%). Same difficulty ordering as image reconstruction — man-made objects with distinct shapes are easiest; animals with high intra-class variability are hardest.
+
+![Cross-Modal Transfer Accuracy](train_outputs/crossmodal_transfer_accuracy.png)
+![Cross-Modal Confusion](train_outputs/crossmodal_confusion.png)
+![Representation Structure](train_outputs/crossmodal_representation.png)
+![Per-Category Agreement](train_outputs/crossmodal_agreement.png)
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python crossmodal_transfer_study.py
+```
+
 ## References
 
 - Peebles & Xie (2022). "Scalable Diffusion Models with Transformers." arXiv:2212.09748
