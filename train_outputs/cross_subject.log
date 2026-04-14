@@ -1,0 +1,173 @@
+======================================================================
+CORTEXFLOW — CROSS-SUBJECT GENERALIZATION STUDY
+======================================================================
+
+Loading trained model...
+  Model loaded: 23.0M params
+
+Loading brain data + TRIBE v2 projection...
+  V-JEPA features: torch.Size([10000, 2816])
+  PCA V: torch.Size([20484, 384])
+
+======================================================================
+SIMULATING 5 SUBJECTS WITH DIFFERENT BRAIN ANATOMIES
+======================================================================
+
+Loading TRIBE v2 for brain projection...
+
+Generating per-subject brain patterns...
+  Subject 0: torch.Size([2000, 384]), mean=0.001, std=1.005
+  Subject 1: torch.Size([2000, 384]), mean=0.001, std=1.000
+  Subject 2: torch.Size([2000, 384]), mean=0.002, std=1.000
+  Subject 3: torch.Size([2000, 384]), mean=-0.001, std=1.000
+  Subject 4: torch.Size([2000, 384]), mean=-0.002, std=1.000
+
+Loading images (first 10000)...
+  Images: torch.Size([10000, 3, 128, 128])
+  Caching VAE latents...
+  Latent shape: [8, 16, 16]
+
+======================================================================
+ANALYSIS 1: INTER-SUBJECT BRAIN SIMILARITY
+======================================================================
+
+  Inter-subject cosine similarity matrix:
+          S0     S1     S2     S3     S4   
+    S0   1.000  0.042  0.036  0.029  0.022 
+    S1   0.042  1.000  0.019  0.000  0.007 
+    S2   0.036  0.019  1.000  0.005  0.055 
+    S3   0.029  0.000  0.005  1.000  -0.002 
+    S4   0.022  0.007  0.055  -0.002  1.000 
+
+  Mean cross-subject similarity: 0.021 ± 0.018
+  Range: [-0.002, 0.055]
+
+======================================================================
+ANALYSIS 2: ZERO-SHOT CROSS-SUBJECT TRANSFER
+======================================================================
+
+Fitting ridge regression for reference subject (S0)...
+
+  Subject 0 (zero-shot, no adaptation):
+    10/50 (4s)
+    20/50 (6s)
+    30/50 (10s)
+    40/50 (14s)
+    50/50 (18s)
+    cos=0.772, SSIM=0.083 (18s)
+
+  Subject 1 (zero-shot, no adaptation):
+    10/50 (4s)
+    20/50 (6s)
+    30/50 (10s)
+    40/50 (13s)
+    50/50 (17s)
+    cos=0.749, SSIM=0.004 (17s)
+
+  Subject 2 (zero-shot, no adaptation):
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (10s)
+    40/50 (13s)
+    50/50 (18s)
+    cos=0.762, SSIM=-0.007 (18s)
+
+  Subject 3 (zero-shot, no adaptation):
+    10/50 (3s)
+    20/50 (6s)
+    30/50 (10s)
+    40/50 (14s)
+    50/50 (18s)
+    cos=0.774, SSIM=0.057 (18s)
+
+  Subject 4 (zero-shot, no adaptation):
+    10/50 (3s)
+    20/50 (7s)
+    30/50 (11s)
+    40/50 (15s)
+    50/50 (18s)
+    cos=0.772, SSIM=0.005 (18s)
+
+  Zero-shot summary:
+    S0: cos=0.772, SSIM=0.083 (reference)
+    S1: cos=0.749, SSIM=0.004
+    S2: cos=0.762, SSIM=-0.007
+    S3: cos=0.774, SSIM=0.057
+    S4: cos=0.772, SSIM=0.005
+
+======================================================================
+ANALYSIS 3: FEW-SHOT LoRA ADAPTATION
+======================================================================
+
+  Subject 1:
+    K=10 shots — adapting LoRA (rank=16)... cos=0.724, SSIM=0.008 (25s, 8208 params)
+    K=25 shots — adapting LoRA (rank=16)... cos=0.738, SSIM=0.008 (25s, 8208 params)
+    K=50 shots — adapting LoRA (rank=16)... cos=0.731, SSIM=-0.064 (24s, 8208 params)
+    K=100 shots — adapting LoRA (rank=16)... cos=0.754, SSIM=-0.031 (24s, 8208 params)
+    K=200 shots — adapting LoRA (rank=16)... cos=0.781, SSIM=-0.000 (23s, 8208 params)
+
+  Subject 2:
+    K=10 shots — adapting LoRA (rank=16)... cos=0.743, SSIM=0.025 (25s, 8208 params)
+    K=25 shots — adapting LoRA (rank=16)... cos=0.738, SSIM=0.010 (24s, 8208 params)
+    K=50 shots — adapting LoRA (rank=16)... cos=0.765, SSIM=0.029 (21s, 8208 params)
+    K=100 shots — adapting LoRA (rank=16)... cos=0.777, SSIM=0.006 (24s, 8208 params)
+    K=200 shots — adapting LoRA (rank=16)... cos=0.796, SSIM=0.029 (24s, 8208 params)
+
+  Subject 3:
+    K=10 shots — adapting LoRA (rank=16)... cos=0.753, SSIM=0.013 (24s, 8208 params)
+    K=25 shots — adapting LoRA (rank=16)... cos=0.764, SSIM=0.027 (25s, 8208 params)
+    K=50 shots — adapting LoRA (rank=16)... cos=0.771, SSIM=0.041 (24s, 8208 params)
+    K=100 shots — adapting LoRA (rank=16)... cos=0.788, SSIM=0.056 (25s, 8208 params)
+    K=200 shots — adapting LoRA (rank=16)... cos=0.793, SSIM=0.050 (23s, 8208 params)
+
+  Subject 4:
+    K=10 shots — adapting LoRA (rank=16)... cos=0.727, SSIM=0.021 (22s, 8208 params)
+    K=25 shots — adapting LoRA (rank=16)... cos=0.737, SSIM=0.032 (25s, 8208 params)
+    K=50 shots — adapting LoRA (rank=16)... cos=0.746, SSIM=0.036 (26s, 8208 params)
+    K=100 shots — adapting LoRA (rank=16)... cos=0.771, SSIM=0.021 (20s, 8208 params)
+    K=200 shots — adapting LoRA (rank=16)... cos=0.784, SSIM=-0.006 (20s, 8208 params)
+
+======================================================================
+ANALYSIS 4: FULL BRAIN ENCODER FINE-TUNING (baseline)
+======================================================================
+
+  Subject 1:
+    K=50 shots — full fine-tuning... cos=0.697, SSIM=-0.070 (25s, 2694912 params)
+    K=200 shots — full fine-tuning... cos=0.756, SSIM=-0.036 (21s, 2694912 params)
+
+  Subject 3:
+    K=50 shots — full fine-tuning... cos=0.755, SSIM=0.036 (23s, 2694912 params)
+    K=200 shots — full fine-tuning... cos=0.773, SSIM=0.034 (21s, 2694912 params)
+
+======================================================================
+GENERATING FIGURES
+======================================================================
+  Saved: train_outputs/cross_subject_adaptation.png
+  Saved: train_outputs/cross_subject_similarity.png
+  Saved: train_outputs/cross_subject_efficiency.png
+
+======================================================================
+SUMMARY — CROSS-SUBJECT GENERALIZATION
+======================================================================
+
+  Subjects simulated:       5 (different brain anatomies)
+  Mean cross-subject sim:   0.021 ± 0.018
+
+  Reference subject (S0):   cos=0.772, SSIM=0.083
+  Zero-shot transfer (avg): cos=0.764, SSIM=0.015
+  Zero-shot drop:           Δcos=+0.008, ΔSSIM=+0.068
+
+  LoRA adaptation (K=200):  cos=0.788, SSIM=0.018
+  LoRA adaptation (K=50):   cos=0.753
+  LoRA recovery:            315.1% cos, 5.2% SSIM
+  LoRA params:              8,208 (vs full encoder)
+
+  Few-shot progression (S1):
+
+    K= 10: cos=0.724, SSIM=0.008
+    K= 25: cos=0.738, SSIM=0.008
+    K= 50: cos=0.731, SSIM=-0.064
+    K=100: cos=0.754, SSIM=-0.031
+    K=200: cos=0.781, SSIM=-0.000
+
+  Saved: train_outputs/cross_subject_results.json
